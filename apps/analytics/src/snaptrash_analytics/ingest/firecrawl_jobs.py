@@ -7,8 +7,7 @@ Run once at hackathon start. Outputs consumed by:
 """
 from __future__ import annotations
 import json
-from pathlib import Path
-from firecrawl import FirecrawlApp
+from firecrawl import V1FirecrawlApp as FirecrawlApp
 from snaptrash_common import settings
 from snaptrash_common.env import REPO_ROOT
 
@@ -25,18 +24,20 @@ def scrape_epa_banned_plastics() -> dict:
     fc = app()
     res = fc.scrape_url(
         "https://www.epa.gov/trash-free-waters/plastic-bans",
-        params={"formats": ["markdown", "json"]},
+        formats=["markdown"],
     )
-    return res
+    return {"markdown": res.markdown, "url": res.url}
 
 
 def scrape_biocycle_compost() -> list[dict]:
+    from firecrawl import V1ScrapeOptions
     fc = app()
     res = fc.crawl_url(
         "https://www.biocycle.net/compost-facility-directory/",
-        params={"limit": 200, "scrapeOptions": {"formats": ["markdown"]}},
+        limit=200,
+        scrape_options=V1ScrapeOptions(formats=["markdown"]),
     )
-    return res.get("data", [])
+    return [{"url": p.url, "markdown": p.markdown} for p in (res.data or [])]
 
 
 def scrape_enzyme_labs() -> list[dict]:
@@ -48,8 +49,8 @@ def scrape_enzyme_labs() -> list[dict]:
     out = []
     for url in seeds:
         try:
-            r = fc.scrape_url(url, params={"formats": ["markdown"]})
-            out.append({"source": url, "content": r})
+            r = fc.scrape_url(url, formats=["markdown"])
+            out.append({"source": url, "markdown": r.markdown})
         except Exception as e:
             print(f"⚠ {url}: {e}")
     return out
