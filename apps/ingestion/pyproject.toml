@@ -1,0 +1,40 @@
+[project]
+name = "snaptrash-ingestion"
+version = "0.1.0"
+description = "Stages 1-5: S3 + Groq Vision + analysis + Databricks write"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "boto3>=1.35",
+    "groq>=0.11",
+    "httpx>=0.27",
+    "python-multipart>=0.0.9",
+    "sendgrid>=6.11",
+    "snaptrash-common",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]
+
+[tool.uv.sources]
+snaptrash-common = { path = "../../packages/common", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/snaptrash_ingestion"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

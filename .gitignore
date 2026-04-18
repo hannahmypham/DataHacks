@@ -1,0 +1,49 @@
+# env / secrets
+.env
+.env.local
+*.pem
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+*.egg
+.python-version
+
+# uv
+uv.lock.bak
+
+# mlflow
+mlruns/
+mlartifacts/
+
+# data
+data/*
+!data/.gitkeep
+
+# node / frontend
+node_modules/
+frontend/dist/
+apps/frontend/dist/
+.vite/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# claude local overrides
+.claude/settings.local.json

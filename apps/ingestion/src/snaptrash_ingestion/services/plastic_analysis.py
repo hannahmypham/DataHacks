@@ -1,0 +1,73 @@
+"""Stage 4 — enrich PlasticItem with polymer type, harmful flag, recyclability.
+
+Banned-state list is a placeholder. Replace by loading data/epa_banned.json
+once Firecrawl scrape job has run (apps/analytics/.../firecrawl_jobs.py).
+"""
+from __future__ import annotations
+import json
+from pathlib import Path
+from snaptrash_common.schemas import PlasticItem
+from snaptrash_common.env import REPO_ROOT
+
+RESIN_TO_POLYMER = {1: "PET", 2: "HDPE", 3: "PVC", 4: "LDPE", 5: "PP", 6: "PS", 7: "Other"}
+RECYCLABLE = {"PET", "HDPE", "PP"}
+HARMFUL = {"PVC", "PS", "PC"}
+
+# fallback static banned map; overridden by Firecrawl JSON if present
+DEFAULT_BANNED = {
+    "PS": ["CA", "NY", "ME"],
+}
+
+_banned_cache: dict | None = None
+
+
+def _banned_map() -> dict:
+    global _banned_cache
+    if _banned_cache is not None:
+        return _banned_cache
+    p = REPO_ROOT / "data" / "epa_banned.json"
+    if p.exists():
+        try:
+            _banned_cache = json.loads(p.read_text())
+            return _banned_cache
+        except Exception:
+            pass
+    _banned_cache = DEFAULT_BANNED
+    return _banned_cache
+
+
+def _infer_polymer(item: PlasticItem) -> str:
+    if item.resin_code and item.resin_code in RESIN_TO_POLYMER:
+        return RESIN_TO_POLYMER[item.resin_code]
+    t = item.type.lower()
+    if "foam" in t or "styrofoam" in t:
+        return "PS"
+    if "bottle" in t or "pet" in t:
+        return "PET"
+    if "bag" in t or "wrap" in t or "cling" in t:
+        return "LDPE"
+    if "container" in t and "clear" in t:
+        return "PET"
+    return "Other"
+
+
+def enrich(item: PlasticItem, *, state: str = "CA") -> PlasticItem:
+    polymer = _infer_polymer(item)
+    item.polymer_type = polymer
+
+    banned_states = _banned_map().get(polymer, [])
+    is_banned = state in banned_states
+    item.recyclable = polymer in RECYCLABLE and not item.is_black_plastic
+    item.harmful = polymer in HARMFUL or item.is_black_plastic
+
+    if is_banned:
+        item.status = f"banned_{state}"
+        item.alert = f"{polymer} {item.type} banned in {state}. Switch to PET clamshell."
+    elif item.harmful:
+        item.status = "harmful"
+        item.alert = f"{polymer} releases harmful additives. Avoid."
+    elif item.recyclable:
+        item.status = "recyclable"
+    else:
+        item.status = "non_recyclable"
+    return item
