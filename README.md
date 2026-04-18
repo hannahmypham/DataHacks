@@ -84,3 +84,18 @@ Frontend skills available at user level: `ui-ux-pro-max`, `21st-dev-magic`, `sha
 | `GROQ_API_KEY` | https://console.groq.com/keys |
 | `FIRECRAWL_API_KEY` | https://www.firecrawl.dev/app |
 | `SENDGRID_API_KEY` | https://app.sendgrid.com/settings/api_keys |
+
+## Grok / Cursor Agent Skills & Rules
+
+The following **project-specific skills** (in `.cursor/skills/`) and rules (in `.cursor/rules/`) have been added from the Cursor marketplace/global skills, customized for SnapTrash:
+
+- `snaptrash` + `snaptrash-core.mdc` (core architecture, data flow, monorepo, schemas, removed barcode/manufacturer features).
+- `databricks-snaptrash` — Databricks CLI/SDK, tables (`scans`, `insights`, `locality_agg`, `enzyme_alerts`), Prophet, bootstrap, MCP, analytics jobs (adapts global databricks skill).
+- `firecrawl-snaptrash` — Scraping EPA plastics, labs, BioCycle (adapts global firecrawl skill; always use for web/research tasks).
+- `ui-ux-snaptrash` — Applies global **UI/UX Pro Max** (palettes, styles, charts, accessibility, shadcn/ui), **Framer Motion** animations (already in frontend deps), and **21st.dev** magic components to the dashboard (scan/results cards, Recharts + animations, Mapbox, gamification). Follows exact screens from the plan.
+
+These are bundled with the repo so every clone gets the full Grok/Cursor intelligence for this project. They reference the global marketplace skills while adding SnapTrash-specific examples, tables, UI mocks, and conventions.
+
+Review `DETAILED-OVERVIEW.md` and the individual skill files. The agent will now automatically apply the right combination (e.g. databricks + firecrawl for analytics jobs, ui-ux for frontend changes).
+
+New contributors: Run `ls -R .cursor` to explore.

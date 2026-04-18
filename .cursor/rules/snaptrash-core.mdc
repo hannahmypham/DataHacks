@@ -1,0 +1,45 @@
+---
+description: Core SnapTrash project conventions, architecture, and data flow. Always applied for this repository.
+alwaysApply: true
+---
+
+# SnapTrash Core Project Rules
+
+**This rule is always active** when working in the SmartWaste/SnapTrash repository.
+
+## Mandatory Context
+- Read and internalize `DETAILED-OVERVIEW.md` (repo structure, complete data flow, setup) and `snaptrash-plan.md` (architecture, stages, tables) on every session.
+- **Critical**: The barcode_visible feature and all manufacturer ID extraction (GS1, ZXing, text_visible brand matching, "Dart Container" references) have been **completely removed**. Do not reintroduce them. Plastic analysis is visual + EPA only.
+- Use the `snaptrash`, `databricks-snaptrash`, `firecrawl-snaptrash`, and `ui-ux-snaptrash` project skills for detailed guidance on pipelines, Databricks jobs, scraping, dashboard UI/UX (with Framer Motion + 21st.dev), schemas, and workflows.
+
+## Architecture & Data Flow (Never Break)
+1. **Frontend** (React/Vite/TS/Tailwind/Mapbox/Recharts) → camera upload → POST /scan → polls insights/locality every ~5s. Two-column results (food left, plastic right with severity badges), charts, map, gamification.
+2. **Ingestion** (FastAPI in `apps/ingestion/`): S3 → Groq Vision (clean JSON without barcode/manufacturer) → `food_analysis.py` (USDA-style lookups + contamination logic: decay_stage>=4 or mold_visible → contaminated=True, compostable=False) + `plastic_analysis.py` (resin→polymer, EPA harmful/banned) → `ScanRow` (Pydantic from common) → Databricks `snaptrash.scans`.
+3. **Analytics** (`apps/analytics/`): Loads MSW Dryad + Firecrawl data → SQL aggregations, Prophet forecasts (MLflow), thresholds → `insights`, `locality_agg`, `enzyme_alerts`. Readers expose data to API/frontend.
+4. **Shared** (`packages/common/`): Schemas, tables DDL, Databricks client, env settings. **Only coupling point** between apps.
+
+## Monorepo & Tooling Rules
+- Use `uv sync` (per-app pyproject.toml installs editable `common` package).
+- Python: Strict type hints (Pydantic models), modular services, tests in `tests/`.
+- Never duplicate schemas or table definitions — always extend `snaptrash_common.*`.
+- Frontend: pnpm, functional components, colocate styles, follow modern UX (leverage ui-ux-pro-max skill where relevant).
+- Scripts: Prefer `scripts/run_dev.sh`, `bootstrap_databricks.py`, `seed_fake_scans.py`.
+- Branches: Work in `dev/ingestion` or `dev/analytics`, integrate to `main`.
+
+## Coding Standards
+- **Schemas first**: All DB rows must exactly match `schemas.py` models and `tables.py`.
+- **Lookups**: Extend `food_analysis.py` dicts (SHELF_LIFE, PRICE_PER_KG, CO2_PER_KG) or replace with real APIs when improving. Keep fuzzy `_key()` matcher.
+- **Databricks**: Use SDK/client from common. Partitioned Delta tables. Keep notebooks in sync.
+- **Documentation**: Update `DETAILED-OVERVIEW.md` when architecture changes.
+- **MCP**: Use Databricks and Firecrawl MCP servers for live queries/scraping.
+- **UI/UX**: Beautiful, responsive dashboard with color-coded badges, charts, map. No breaking changes to results screen layout from the plan.
+
+## When Editing
+- Preserve the ingestion ↔ analytics contract.
+- Add tests for new logic.
+- Maintain the "single source of truth" in Databricks.
+- If adding features, update the skill/rule files and overview docs.
+
+This rule + the `snaptrash` skill ensures every Grok interaction produces consistent, production-quality contributions aligned with the project's vision, removed features, and technical decisions.
+
+For full skill authoring patterns, see the built-in create-skill and create-rule skills.
