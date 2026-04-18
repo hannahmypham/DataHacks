@@ -307,8 +307,53 @@ E. THRESHOLD DETECTION
    IF total_pet_kg_7day > (msw_state_avg × restaurant_count × 0.8)
    → SET enzyme_alert = true, alert_zip = zip
 
-F. WRITE BACK computed results to Delta tables
-   insights/{restaurant_id} → weekly_dollar_waste, forecast, percentile, recommendation
+F. SUSTAINABILITY SCORE + BADGE (runs after B + D, per restaurant per week)
+
+   Input fields (all from rolling 7-day window):
+   - contaminated_kg, food_kg          → contamination_rate
+   - harmful_plastic_count, plastic_count → harmful_packaging_rate
+   - food_kg this week vs last week    → waste_trend_direction
+   - food_kg delta week-over-week      → improvement_delta
+   - locality_percentile (from step D) → peer_score
+
+   Component scores (each 0–100):
+
+   contamination_score  = (1 - contaminated_kg / NULLIF(food_kg, 0)) * 100
+   packaging_score      = (1 - harmful_plastic_count / NULLIF(plastic_count, 0)) * 100
+   trend_score          = CASE
+                            WHEN food_kg_this_week < food_kg_last_week * 0.95 THEN 100
+                            WHEN food_kg_this_week < food_kg_last_week * 1.05 THEN 50
+                            ELSE 0
+                          END
+   improvement_score    = LEAST(100, GREATEST(0,
+                            (food_kg_last_week - food_kg_this_week)
+                            / NULLIF(food_kg_last_week, 0) * 300
+                          ))
+   peer_score           = locality_percentile * 100
+
+   Weighted total:
+   sustainability_score = ROUND(
+     contamination_score  * 0.30 +
+     packaging_score      * 0.25 +
+     trend_score          * 0.20 +
+     improvement_score    * 0.15 +
+     peer_score           * 0.10
+   , 1)
+
+   Badge assignment:
+   score 91–100 → "Green Leader"
+   score 76–90  → "Gold"
+   score 61–75  → "Silver"
+   score 41–60  → "Bronze"
+   score 0–40   → null (no badge)
+
+   Feedback message (FastAPI assembles from fields):
+   "Sustainability Score: {score}/100 — {badge}. 
+    You're doing better than {percentile}% of restaurants in {neighborhood} this week."
+
+G. WRITE BACK computed results to Delta tables
+   insights/{restaurant_id} → weekly_dollar_waste, forecast, percentile, recommendation,
+                               sustainability_score, badge_tier, score_feedback_message
    locality_agg/{zip} → aggregated plastic + food metrics
    enzyme_alerts → zip, threshold, volume, timestamp
 ```
@@ -340,7 +385,7 @@ Lovable prompts to generate:
     with color-coded severity badges"
 3. "Weekly waste trend line chart with forecast dotted line using Recharts"
 4. "Mapbox choropleth map of San Diego neighborhoods colored by plastic usage"
-5. "Gamification popup: confetti animation + percentile badge"
+5. "Gamification popup: confetti animation + sustainability score (0-100) + badge tier (Bronze/Silver/Gold/Green Leader) + percentile message"
 
 Screens:
 
@@ -358,7 +403,7 @@ Screens:
   │ CONTAMINATED ❌  │                  │
   └─────────────────┴──────────────────┘
 
-  POPUP: "🎉 Better than 77% of La Jolla today!"
+  POPUP: "🎉 Score: 84/100 — Silver Badge. Better than 77% of La Jolla today!"
 
 ③ WEEKLY DASHBOARD
   Line chart: waste_kg per day + forecast
@@ -473,7 +518,10 @@ CREATE TABLE snaptrash.insights (
   locality_percentile DOUBLE,
   top_waste_category STRING,
   recommendation STRING,
-  co2_avoided DOUBLE
+  co2_avoided DOUBLE,
+  sustainability_score DOUBLE,       -- 0.0–100.0
+  badge_tier STRING,                 -- 'Green Leader' | 'Gold' | 'Silver' | 'Bronze' | null
+  score_feedback_message STRING      -- pre-assembled display string for frontend popup
 ) USING DELTA;
 
 -- Locality aggregates
