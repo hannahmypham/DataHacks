@@ -19,7 +19,9 @@ dist/
 .python-version
 
 # uv
+uv.lock
 uv.lock.bak
+apps/*/uv.lock
 
 # mlflow
 mlruns/
@@ -35,6 +37,10 @@ frontend/dist/
 apps/frontend/dist/
 .vite/
 *.log
+pnpm-lock.yaml
+apps/*/pnpm-lock.yaml
+package-lock.json
+yarn.lock
 
 # OS
 .DS_Store
