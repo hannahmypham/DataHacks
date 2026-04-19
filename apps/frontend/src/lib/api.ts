@@ -53,7 +53,6 @@ export type Insight = {
   weekly_dollar_waste: number;
   weekly_food_kg?: number;
   weekly_plastic_count?: number;
-  forecast_next_week?: number;
   forecast_dollar_waste?: number;
   forecast_food_kg?: number;
   forecast_plastic_count?: number;

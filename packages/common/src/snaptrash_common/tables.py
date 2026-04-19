@@ -110,7 +110,7 @@ def ddl_insights() -> str:
         zip_restaurant_count   INT,
         better_than_count      INT,
         -- sustainability score (Person B 5-signal spec, equal 20% weights)
-        sustainability_score   DOUBLE,   -- 0–100
+        sustainability_score   DOUBLE,   -- 1–4
         signal_1               DOUBLE,   -- food_vs_zip
         signal_2               DOUBLE,   -- banned+harmful plastics penalty
         signal_3               DOUBLE,   -- recyclability_rate

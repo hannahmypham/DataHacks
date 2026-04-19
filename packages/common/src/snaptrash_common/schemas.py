@@ -74,16 +74,39 @@ class ScanRow(BaseModel):
 class InsightRow(BaseModel):
     restaurant_id: str
     computed_at: datetime
-    weekly_dollar_waste: float
-    forecast_next_week: float
-    locality_percentile: float
-    top_waste_category: str
-    recommendation: str
-    co2_avoided: float
-    # Sustainability score (new per spec)
-    sustainability_score: float = 0.0
+    weekly_food_kg: float = 0.0
+    weekly_dollar_waste: float = 0.0
+    weekly_plastic_count: int = 0
+    weekly_co2_kg: float = 0.0
+    forecast_food_kg: float = 0.0
+    forecast_dollar_waste: float = 0.0
+    forecast_plastic_count: int = 0
+    locality_percentile: float = 0.0
+    locality_percentile_pct: int = 0
+    better_than_count: int = 0
+    zip_restaurant_count: int = 0
+    sustainability_score: float = 1.0  # 1–4 scale
+    signal_1: float = 0.0
+    signal_2: float = 0.0
+    signal_3: float = 0.0
+    signal_4: float = 0.0
+    signal_5: float = 0.0
     badge_tier: str | None = None
+    tier_emoji: str | None = None
+    tier_key: str | None = None
+    peak_waste_day: str | None = None
+    peak_waste_day_kg: float = 0.0
+    top_waste_category: str | None = None
+    recommendation: str | None = None
     score_feedback_message: str | None = None
+    co2_avoided: float = 0.0
+    shelf_life_min_days: float = 0.0
+    shelf_life_avg_days: float = 0.0
+    at_risk_kg_24h: float = 0.0
+    nearest_facility_name: str | None = None
+    nearest_facility_km: float | None = None
+    harmful_plastic_count: float = 0.0
+    ban_flag_count: float = 0.0
 
 
 class LocalityAggRow(BaseModel):
