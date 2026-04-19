@@ -48,7 +48,7 @@ def presign_get(key: str, expires: int = 3600) -> str:
     )
 
 
-RAW_BUCKET = "snaptrash-raw-incoming"
+RAW_BUCKET = settings.S3_RAW_BUCKET
 
 
 def presign_put_raw(

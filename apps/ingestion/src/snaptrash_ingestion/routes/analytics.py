@@ -13,7 +13,7 @@ router = APIRouter(tags=["analytics"])
 # Databricks SQL warehouse returns every value as a string.
 # These sets define which fields to cast so the frontend receives proper JSON types.
 _FLOAT_FIELDS = {
-    # insights
+    # insights — core metrics
     "weekly_dollar_waste", "weekly_food_kg", "weekly_plastic_count", "weekly_co2_kg",
     "compost_yield_rate", "contamination_rate",
     "forecast_food_kg", "forecast_dollar_waste", "forecast_plastic_count",
@@ -21,10 +21,12 @@ _FLOAT_FIELDS = {
     "better_than_count", "zip_restaurant_count",
     "sustainability_score",
     "peak_waste_day_kg", "at_risk_kg_24h",
-    "nearest_facility_km",
+    "nearest_facility_km", "nearest_facility_capacity_tons", "ca_network_capacity_tons",
     "co2_avoided", "shelf_life_min_days", "shelf_life_avg_days",
     "harmful_plastic_count", "ban_flag_count",
     "wcs_food_pct_restaurant", "wcs_food_pct_ca_avg", "wcs_gap",
+    # insights — per-signal breakdown
+    "signal_1", "signal_2", "signal_3", "signal_4", "signal_5",
     # locality
     "total_pet_kg", "total_ps_count", "harmful_count", "active_restaurants",
     "total_food_kg", "avg_food_kg_per_restaurant", "food_waste_per_capita_kg",
@@ -97,7 +99,7 @@ def get_weekly_series(restaurant_id: str):
         raise HTTPException(503, f"Databricks unavailable: {exc}") from exc
 
     # dayofweek: 1=Sun, 2=Mon, 3=Tue, 4=Wed, 5=Thu, 6=Fri, 7=Sat
-    dow_order = {1: "S", 2: "M", 3: "T", 4: "W", 5: "T", 6: "F", 7: "S"}
+    dow_order = {1: "Su", 2: "M", 3: "Tu", 4: "W", 5: "Th", 6: "F", 7: "Sa"}
     out = []
     for r in rows:
         try:

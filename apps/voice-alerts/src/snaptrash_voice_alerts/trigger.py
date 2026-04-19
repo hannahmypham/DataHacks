@@ -57,6 +57,5 @@ def run_voice_alert_check(specific_zip: str | None = None) -> None:
 
 
 if __name__ == "__main__":
-    import time  # for placeholder
     run_voice_alert_check()
     # Example: run_voice_alert_check("92101") for specific ZIP
