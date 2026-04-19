@@ -106,3 +106,53 @@ class EnzymeAlertRow(BaseModel):
     threshold: float
     forecast_peak: float
     notified: bool
+
+
+class PlasticReportContext(BaseModel):
+    """Context passed to Vapi assistant (variableValues) OR SMTP email reports.
+    Used by both voice alerts and new email alerts (per plan)."""
+    locality: str
+    neighborhood: str
+    total_plastic_kg: float
+    harmful_count: int
+    pet_kg: float
+    weekly_plastic_count: int
+    active_restaurants: int
+    threshold: float = 150.0
+    lab_recommendation: str = "Contact BluumBio (Berkeley, CA) for plastic-eating enzymes from the CSV data."
+    stats_summary: str
+    forecast_note: str = "Prophet forecast indicates continued high waste without intervention."
+    action_call: str = "Reduce single-use plastics and switch to compostable alternatives."
+
+
+class VoiceAlertRow(BaseModel):
+    """Row for snaptrash.voice_alerts table - logs triggered calls and outcomes."""
+    alert_id: str
+    zip: str
+    neighborhood: str
+    triggered_at: datetime
+    plastic_volume_7day: float
+    threshold: float
+    report_context_json: str  # serialized PlasticReportContext
+    call_id: str | None = None
+    transcript: str | None = None
+    status: str = "triggered"  # triggered, calling, completed, failed
+    notified: bool = False
+    ended_reason: str | None = None
+
+
+class EmailAlertRow(BaseModel):
+    """Row for snaptrash.email_alerts table (new for SMTP plastic alerts).
+    Logs sent emails to hardcoded recipients (manasvinsurya.nitt02@gmail.com, mbj@ucsd.edu).
+    Mirrors VoiceAlertRow but for email status. Used to prevent duplicate notifications."""
+    alert_id: str
+    zip: str
+    neighborhood: str
+    triggered_at: datetime
+    plastic_volume_7day: float
+    threshold: float
+    report_context_json: str  # serialized PlasticReportContext
+    sent_to: str  # comma-separated list of emails
+    status: str = "sent"  # sent, failed, skipped
+    notified: bool = True
+    error: str | None = None

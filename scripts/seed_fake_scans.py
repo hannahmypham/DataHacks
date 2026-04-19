@@ -35,7 +35,7 @@ INSERT INTO {SCANS} VALUES (
   :food_kg, :compostable_kg, :contaminated_kg,
   :dollar_wastage, :co2_kg,
   :plastic_count, :harmful_plastic_count,
-  :pet_kg, :ps_count,
+  :pet_kg, :ps_count, :total_plastic_kg, :ban_flag_count, :recyclable_count,
   :food_items_json, :plastic_items_json
 )
 """
@@ -52,6 +52,9 @@ def fake_scan(rid: str, zipc: str, nb: str, ts: datetime) -> dict:
     ps = sum(1 for _, _, p in pkinds if p == "PS")
     pet = round(0.05 * sum(1 for _, _, p in pkinds if p == "PET"), 2)
     harmful = ps
+    total_plastic = round(plastic_n * 0.12 + pet * 2, 2)
+    ban_flag = random.randint(0, max(1, plastic_n // 3))
+    recyclable = max(0, plastic_n - harmful - ban_flag)
     return {
         "scan_id": str(uuid.uuid4()),
         "restaurant_id": rid,
@@ -67,8 +70,11 @@ def fake_scan(rid: str, zipc: str, nb: str, ts: datetime) -> dict:
         "harmful_plastic_count": harmful,
         "pet_kg": pet,
         "ps_count": ps,
-        "food_items_json": json.dumps([{"type": random.choice(FOOD_TYPES), "estimated_kg": food_kg}]),
-        "plastic_items_json": json.dumps([{"type": t, "resin_code": rc, "polymer_type": pt} for t, rc, pt in pkinds]),
+        "total_plastic_kg": total_plastic,
+        "ban_flag_count": ban_flag,
+        "recyclable_count": recyclable,
+        "food_items_json": json.dumps([{"type": random.choice(FOOD_TYPES), "estimated_kg": food_kg, "decay_stage": random.randint(1,5), "contaminated": contam > 0.3}]),
+        "plastic_items_json": json.dumps([{"type": t, "resin_code": rc, "polymer_type": pt, "estimated_kg": round(0.15,2)} for t, rc, pt in pkinds]),
     }
 
 

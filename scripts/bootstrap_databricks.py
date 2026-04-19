@@ -1,4 +1,6 @@
-"""Idempotent: create snaptrash schema + all Delta tables. Run once after .env is filled."""
+"""Idempotent: create snaptrash schema + all Delta tables (including new EMAIL_ALERTS for SMTP alerts).
+Run once after .env is filled and uv sync. Now includes email_alerts DDL via ALL_DDL (per plan).
+"""
 from __future__ import annotations
 from snaptrash_common.databricks_client import execute
 from snaptrash_common.tables import ddl_create_schema, ALL_DDL

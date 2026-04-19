@@ -69,6 +69,22 @@ class _Settings:
     USDA_API_KEY: str = _str("USDA_API_KEY")
     MAPBOX_TOKEN: str = _str("MAPBOX_TOKEN")
 
+    # Vapi / Voice Alerts (user provides existing Assistant/Phone/Twilio integration)
+    VAPI_API_KEY: str = _str("VAPI_API_KEY")
+    VAPI_ASSISTANT_ID: str = _str("VAPI_ASSISTANT_ID")
+    VAPI_PHONE_NUMBER_ID: str = _str("VAPI_PHONE_NUMBER_ID")
+    DEFAULT_ALERT_PHONE: str = _str("DEFAULT_ALERT_PHONE", "+18582146584")
+    TEST_PHONE_OVERRIDE: str = _str("TEST_PHONE_OVERRIDE")
+
+    # SMTP for Email Alerts (Gmail App Password; see EMAIL_CONFIRMATION_SYSTEM.md)
+    # Use dedicated Gmail with 2FA + App Password (not regular password)
+    SMTP_HOST: str = _str("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = _int("SMTP_PORT", 587)
+    SMTP_USER: str = _str("SMTP_USER")
+    SMTP_PASS: str = _str("SMTP_PASS")
+    ALERT_FROM_EMAIL: str = _str("ALERT_FROM_EMAIL", "manasvinsurya.nitt02@gmail.com")
+    ALERT_TO_EMAILS: str = _str("ALERT_TO_EMAILS", "manasvinsurya.nitt02@gmail.com,mbj@ucsd.edu")
+
     # App
     ENV: str = _str("ENV", "dev")
     LOG_LEVEL: str = _str("LOG_LEVEL", "INFO")
