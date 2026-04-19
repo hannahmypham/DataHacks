@@ -9,11 +9,16 @@ _s3 = None
 def s3():
     global _s3
     if _s3 is None:
+        # Temp creds (Lambda IAM role) start with ASIA — don't pass them explicitly
+        # or boto3 will use them without the required session token. Let boto3
+        # resolve credentials via the standard chain (IAM role / env / ~/.aws).
+        key = settings.AWS_ACCESS_KEY_ID
+        use_explicit = bool(key) and not key.startswith("ASIA")
         _s3 = boto3.client(
             "s3",
             region_name=settings.AWS_REGION,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None,
+            aws_access_key_id=key if use_explicit else None,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY if use_explicit else None,
             config=Config(signature_version="s3v4"),
         )
     return _s3
