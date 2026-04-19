@@ -8,14 +8,35 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 import logging
 from time import perf_counter
 
+from snaptrash_common.databricks_client import fetch_all
 from snaptrash_common.schemas import ScanRow
+from snaptrash_common.tables import SCANS
 
-from ..services import s3_client, grok_vision, food_analysis, plastic_analysis
+from ..services import s3_client, grok_vision, food_analysis, plastic_analysis, pipeline_trigger
 from ..writers import databricks_writer
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/scan", tags=["scan"])
+
+
+@router.get("/latest/{restaurant_id}")
+def get_latest_scan(restaurant_id: str):
+    rows = fetch_all(
+        f"""SELECT scan_id, timestamp, food_kg, dollar_wastage, plastic_count,
+                   harmful_plastic_count, ban_flag_count,
+                   food_items_json, plastic_items_json
+            FROM {SCANS}
+            WHERE restaurant_id = :rid
+            ORDER BY timestamp DESC LIMIT 1""",
+        {"rid": restaurant_id},
+    )
+    if not rows:
+        raise HTTPException(404, f"No scans found for {restaurant_id}")
+    row = dict(rows[0])
+    row["food_items"] = json.loads(row.pop("food_items_json") or "[]")
+    row["plastic_items"] = json.loads(row.pop("plastic_items_json") or "[]")
+    return row
 
 
 @router.get("/upload-url")
@@ -114,6 +135,9 @@ async def create_scan(
         stage_start = perf_counter()
         databricks_writer.insert_scan(row)
         logger.info(f"[{scan_id}] Databricks insert took {perf_counter() - stage_start:.2f}s")
+
+        # Stage 6 — kick off aggregation pipeline (fire-and-forget, 90s cooldown)
+        pipeline_trigger.trigger()
 
         total_time = perf_counter() - start_total
         logger.info(f"[{scan_id}] ✅ Total scan processing: {total_time:.2f}s (SUCCESS)")

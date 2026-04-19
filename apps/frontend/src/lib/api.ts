@@ -76,6 +76,11 @@ export type Insight = {
   nearest_facility_km?: number;
   harmful_plastic_count?: number;
   ban_flag_count?: number;
+  signal_1?: number;
+  signal_2?: number;
+  signal_3?: number;
+  signal_4?: number;
+  signal_5?: number;
   signals?: Record<string, any>;
   enzyme_alert?: boolean;
 };
@@ -94,6 +99,18 @@ export type LocalityAgg = {
   score_feedback_message?: string;
 };
 
+export type LatestScan = {
+  scan_id: string;
+  timestamp: string;
+  food_kg: number;
+  dollar_wastage: number;
+  plastic_count: number;
+  harmful_plastic_count: number;
+  ban_flag_count: number;
+  food_items: FoodItem[];
+  plastic_items: PlasticItem[];
+};
+
 // ---- endpoints ----
 export const health = () => get<{ status: string }>("/health");
 
@@ -105,6 +122,9 @@ export const submitScan = (file: File, restaurantId: string, zip: string, neighb
   f.append("neighborhood", neighborhood);
   return postForm<ScanResponse>("/scan", f);
 };
+
+export const getLatestScan = (restaurantId: string) =>
+  get<LatestScan>(`/scan/latest/${restaurantId}`);
 
 export const getInsights = (restaurantId: string) =>
   get<Insight>(`/insights/${restaurantId}`);
