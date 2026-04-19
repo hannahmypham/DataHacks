@@ -56,10 +56,6 @@ def main():
                     "peak": pet * 1.2,
                 },
             )
-            execute(
-                f"UPDATE {LOCALITY_AGG} SET enzyme_alert = true WHERE zip = :zip",
-                {"zip": r["zip"]},
-            )
             alerts += 1
     print(f"✅ {alerts} enzyme alerts emitted")
 
