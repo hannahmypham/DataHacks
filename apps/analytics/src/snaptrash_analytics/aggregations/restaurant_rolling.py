@@ -87,6 +87,7 @@ SELECT
   COLLECT_LIST(plastic_items_json) AS plastic_jsons
 FROM {SCANS_UNIFIED}
 WHERE timestamp >= NOW() - INTERVAL 7 DAYS
+  AND restaurant_id NOT LIKE 'synth-%'
 GROUP BY restaurant_id
 """
 
@@ -98,6 +99,7 @@ SELECT
   SUM(food_kg)                    AS food_kg
 FROM {SCANS_UNIFIED}
 WHERE timestamp >= NOW() - INTERVAL 28 DAYS
+  AND restaurant_id NOT LIKE 'synth-%'
 GROUP BY restaurant_id, DATE_FORMAT(timestamp, 'EEEE')
 """
 
