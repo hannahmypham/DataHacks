@@ -20,7 +20,7 @@ import type {
   LocalityAgg,
   LatestScan,
 } from "@/lib/api";
-import { getInsights, getLocality, getLatestScan, getWeeklySeries } from "@/lib/api";
+import { getInsights, getLocality, getLatestScan } from "@/lib/api";
 
 const RESTAURANT_ID = "demo-restaurant-001";
 const ZIP = "92101";
@@ -81,6 +81,14 @@ const mockLocality: LocalityAgg = {
 };
 
 // Fallback static data — overwritten at runtime by getWeeklySeries() API call
+const DAY_EXPAND: Record<string, string> = {
+  Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday",
+  Fri: "Friday", Sat: "Saturday", Sun: "Sunday",
+  Monday: "Monday", Tuesday: "Tuesday", Wednesday: "Wednesday", Thursday: "Thursday",
+  Friday: "Friday", Saturday: "Saturday", Sunday: "Sunday",
+};
+const expandDay = (d: string) => DAY_EXPAND[d] ?? d;
+
 let weeklySeries = [
   { day: "Monday",    actual: 6.2,  forecast: 6.5  },
   { day: "Tuesday",   actual: 7.8,  forecast: 7.2  },
@@ -310,21 +318,36 @@ function ScoreSection({ lastScan }: { lastScan: LatestScan | null }) {
 
         {/* Score circle */}
         <div className="mb-10 flex flex-col items-center">
-          <div className="relative mb-8">
-            <svg width="320" height="320" className="-rotate-90 transform">
+          <a
+            href="https://snap-fetch-design.lovable.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group relative mb-8 block cursor-pointer"
+            title="Open SnapTrash App"
+          >
+            {/* Subtle outer glow ring — always visible, pulses on hover */}
+            <div className="absolute inset-0 rounded-full opacity-20 ring-1 ring-inset ring-white/30 transition-all duration-500 group-hover:opacity-60 group-hover:ring-white/50 group-hover:shadow-[0_0_40px_8px_hsl(var(--signal-good)/0.25)]" />
+            <svg width="320" height="320" className="-rotate-90 transform transition-transform duration-300 group-hover:scale-[1.03]">
               <circle cx="160" cy="160" r="140" stroke="hsl(0 0% 100% / 0.15)" strokeWidth="20" fill="none" />
               <circle
                 cx="160" cy="160" r="140"
                 stroke={scoreColor} strokeWidth="20" fill="none" strokeLinecap="round"
                 strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
-                style={{ transition: "stroke-dashoffset 1.5s ease-out" }}
+                style={{ transition: "stroke-dashoffset 1.5s ease-out, filter 0.3s ease" }}
+                className="group-hover:[filter:drop-shadow(0_0_8px_currentColor)]"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <div className="mb-2 text-8xl font-extrabold tracking-tight tabular-nums">{score.toFixed(1)}</div>
               <div className="text-lg uppercase tracking-wide text-foreground/70">Score</div>
+              {/* Always-visible tap hint — very faint */}
+              <div className="mt-3 flex items-center gap-1 text-[10px] font-medium uppercase tracking-[0.2em] text-foreground/25 transition-colors duration-300 group-hover:text-foreground/60">
+                <span className="h-px w-4 bg-current" />
+                <span>click to scan</span>
+                <span className="h-px w-4 bg-current" />
+              </div>
             </div>
-          </div>
+          </a>
 
           {/* Recommendation */}
           <div className="mb-8 w-full rounded-xl border border-signal-info/40 bg-signal-info/20 px-4 py-2.5 backdrop-blur-md">
@@ -503,6 +526,7 @@ function WasteSection() {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--brand-card-border) / 0.2)" />
             <XAxis
               dataKey="day"
+              tickFormatter={(v: string) => v.slice(0, 3)}
               tick={{ fill: "hsl(var(--brand-tan) / 0.8)", fontSize: 12 }}
               axisLine={{ stroke: "hsl(var(--brand-card-border) / 0.4)" }}
             />
@@ -758,28 +782,30 @@ function GlobalSection() {
       })()}
 
       {/* Daily Forecast Breakdown */}
-      <div className="card-brand mb-6">
-        <h3 className="mb-6 text-lg font-bold uppercase tracking-wide text-brand-tan">
-          Locality Level Daily Forecast Breakdown
-        </h3>
-        <div className="space-y-3">
-          {(() => {
-            const maxVal = Math.max(...dailyForecast.map(d => d.value), 1);
-            return dailyForecast.map((d) => (
-            <div key={d.day} className="flex items-center gap-4">
-              <div className="w-24 text-sm opacity-70">{d.day}</div>
-              <div className="h-8 flex-1 overflow-hidden rounded-lg border border-foreground/20 bg-foreground/10">
-                <div
-                  className="h-full bg-gradient-to-r from-signal-warn to-signal-amber transition-all duration-1000 ease-out"
-                  style={{ width: `${(d.value / maxVal) * 100}%` }}
-                />
-              </div>
-              <div className="w-20 text-right font-bold tabular-nums">{d.value} lbs</div>
+      {(() => {
+        const maxVal = Math.max(...dailyForecast.map(d => d.value), 1);
+        return (
+          <div className="card-brand mb-6">
+            <h3 className="mb-6 text-lg font-bold uppercase tracking-wide text-brand-tan">
+              Locality Level Daily Forecast Breakdown
+            </h3>
+            <div className="space-y-3">
+              {dailyForecast.map((d) => (
+                <div key={d.day} className="flex items-center gap-4">
+                  <div className="w-28 text-sm opacity-70">{d.day}</div>
+                  <div className="h-8 flex-1 overflow-hidden rounded-lg border border-foreground/20 bg-foreground/10">
+                    <div
+                      className="h-full bg-gradient-to-r from-signal-warn to-signal-amber transition-all duration-1000 ease-out"
+                      style={{ width: `${(d.value / maxVal) * 100}%` }}
+                    />
+                  </div>
+                  <div className="w-20 text-right font-bold tabular-nums">{d.value} lbs</div>
+                </div>
+              ))}
             </div>
-            ));
-          })()}
-        </div>
-      </div>
+          </div>
+        );
+      })()}
 
       {/* Nearest Facility */}
       <div className="card-brand-success">
@@ -830,8 +856,7 @@ const Index = () => {
       Promise.all([
         getInsights(RESTAURANT_ID).catch(() => null),
         getLocality(ZIP).catch(() => null),
-        getWeeklySeries(RESTAURANT_ID).catch(() => null),
-      ]).then(([insight, locality, series]) => {
+      ]).then(([insight, locality]) => {
         if (insight) {
           Object.assign(mockInsight, insight);
           // Databricks returns numbers as strings — coerce all numeric fields
@@ -853,23 +878,6 @@ const Index = () => {
         }
         if (locality) {
           Object.assign(mockLocality, locality);
-        }
-        // Wire weekly series from API — convert kg→lbs, compute forecast via Prophet ratio
-        if (series && series.length > 0) {
-          const actualTotal = series.reduce((s, d) => s + d.actual, 0);
-          const forecastKg = insight ? Number(insight.forecast_food_kg ?? 0) : 0;
-          // If Prophet forecast is available and > 0, use ratio; else flat (ratio=1)
-          const ratio = actualTotal > 0 && forecastKg > 0 ? forecastKg / actualTotal : 1.0;
-          weeklySeries = series.map((d) => ({
-            day: d.day,
-            actual: parseFloat((d.actual * KG_TO_LBS).toFixed(2)),
-            forecast: parseFloat((d.actual * ratio * KG_TO_LBS).toFixed(2)),
-          }));
-          // Daily forecast breakdown: same pattern × ratio, in lbs
-          dailyForecast = series.map((d) => ({
-            day: d.day,
-            value: parseFloat((d.actual * ratio * KG_TO_LBS).toFixed(2)),
-          }));
         }
         setTick(t => t + 1);
       });
