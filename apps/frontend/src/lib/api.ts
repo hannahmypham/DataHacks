@@ -95,6 +95,18 @@ export type LocalityAgg = {
   score_feedback_message?: string;
 };
 
+export type LatestScan = {
+  scan_id: string;
+  timestamp: string;
+  food_kg: number;
+  dollar_wastage: number;
+  plastic_count: number;
+  harmful_plastic_count: number;
+  ban_flag_count: number;
+  food_items: FoodItem[];
+  plastic_items: PlasticItem[];
+};
+
 // ---- endpoints ----
 export const health = () => get<{ status: string }>("/health");
 
@@ -106,6 +118,9 @@ export const submitScan = (file: File, restaurantId: string, zip: string, neighb
   f.append("neighborhood", neighborhood);
   return postForm<ScanResponse>("/scan", f);
 };
+
+export const getLatestScan = (restaurantId: string) =>
+  get<LatestScan>(`/scan/latest/${restaurantId}`);
 
 export const getInsights = (restaurantId: string) =>
   get<Insight>(`/insights/${restaurantId}`);
