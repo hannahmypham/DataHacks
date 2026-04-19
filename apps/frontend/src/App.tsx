@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Insight, LocalityAgg } from "./lib/api";
+import { getInsights, getLocality } from "./lib/api";
 import { cn } from "./lib/cn";
 
 const RESTAURANT_ID = "test-restaurant-001";
@@ -624,8 +625,19 @@ const FoodDecoSVG = ({ active }: { active: boolean }) => (
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const insights = MOCK_INSIGHTS;
-  const locality = MOCK_LOCALITY;
+  const [insights, setInsights] = useState<Insight>(MOCK_INSIGHTS);
+  const [locality, setLocality] = useState<LocalityAgg>(MOCK_LOCALITY);
+
+  // Fetch real data; silently fall back to mock on error
+  useEffect(() => {
+    getInsights(RESTAURANT_ID)
+      .then((data) => setInsights(data))
+      .catch((err) => console.warn("[SnapWaste] insights unavailable, using mock:", err));
+
+    getLocality(ZIP)
+      .then((data) => setLocality(data))
+      .catch((err) => console.warn("[SnapWaste] locality unavailable, using mock:", err));
+  }, []);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [activeScreen, setActiveScreen] = useState(1);
