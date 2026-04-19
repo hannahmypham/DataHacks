@@ -51,7 +51,7 @@ class _Settings:
     DATABRICKS_WAREHOUSE_ID: str = _str("DATABRICKS_WAREHOUSE_ID")
     DATABRICKS_CATALOG: str = _str("DATABRICKS_CATALOG", "workspace")
     DATABRICKS_SCHEMA: str = _str("DATABRICKS_SCHEMA", "snaptrash")
-    DATABRICKS_USER: str = _str("DATABRICKS_USER", "ara023@ucsd.edu")
+    DATABRICKS_USER: str = _str("DATABRICKS_USER")  # set in .env — no default to avoid PII in source
 
     # AWS
     AWS_REGION: str = _str("AWS_REGION", "us-west-2")
@@ -73,7 +73,7 @@ class _Settings:
     VAPI_API_KEY: str = _str("VAPI_API_KEY")
     VAPI_ASSISTANT_ID: str = _str("VAPI_ASSISTANT_ID")
     VAPI_PHONE_NUMBER_ID: str = _str("VAPI_PHONE_NUMBER_ID")
-    DEFAULT_ALERT_PHONE: str = _str("DEFAULT_ALERT_PHONE", "+18582146584")
+    DEFAULT_ALERT_PHONE: str = _str("DEFAULT_ALERT_PHONE")  # set in .env — no default to avoid PII in source
     TEST_PHONE_OVERRIDE: str = _str("TEST_PHONE_OVERRIDE")
 
     # SMTP for Email Alerts (Gmail App Password; see EMAIL_CONFIRMATION_SYSTEM.md)
@@ -82,8 +82,8 @@ class _Settings:
     SMTP_PORT: int = _int("SMTP_PORT", 587)
     SMTP_USER: str = _str("SMTP_USER")
     SMTP_PASS: str = _str("SMTP_PASS")
-    ALERT_FROM_EMAIL: str = _str("ALERT_FROM_EMAIL", "manasvinsurya.nitt02@gmail.com")
-    ALERT_TO_EMAILS: str = _str("ALERT_TO_EMAILS", "manasvinsurya.nitt02@gmail.com,mbj@ucsd.edu")
+    ALERT_FROM_EMAIL: str = _str("ALERT_FROM_EMAIL")  # set in .env — no default to avoid PII in source
+    ALERT_TO_EMAILS: str = _str("ALERT_TO_EMAILS")   # comma-separated; set in .env
 
     # App
     ENV: str = _str("ENV", "dev")

@@ -6,12 +6,12 @@ If different, copies to analyzed bucket and triggers full Grok analysis.
 from __future__ import annotations
 import json
 import boto3
-import urllib.request
 from urllib.parse import unquote_plus, unquote
 from datetime import datetime, timezone
 from decimal import Decimal
 
 from snaptrash_common.env import settings
+from snaptrash_common.databricks_jobs import submit_aggregation_job
 # Import existing services (package must be included in Lambda deployment package/layer)
 from snaptrash_ingestion.services.grok_vision import analyze_image
 from snaptrash_ingestion.services.s3_client import get_object_bytes, copy_object
@@ -21,40 +21,6 @@ from snaptrash_common.schemas import GrokVisionResult, ScanRow
 import uuid
 
 s3 = boto3.client('s3')
-
-
-def _trigger_aggregation() -> None:
-    """
-    Fire-and-forget: submit 02_aggregations notebook to Databricks after scan write.
-    Does NOT wait for result — Lambda returns immediately.
-    Errors are logged but never raised (scan already saved; insights will catch up).
-    """
-    try:
-        host  = settings.DATABRICKS_HOST.rstrip("/")
-        token = settings.DATABRICKS_TOKEN
-        user  = settings.DATABRICKS_USER
-        nb_path = f"/Users/{user}/snaptrash/02_aggregations"
-        body = json.dumps({
-            "run_name": "snaptrash-agg-scan-trigger",
-            "tasks": [{
-                "task_key": "02_aggregations",
-                "notebook_task": {"notebook_path": nb_path, "source": "WORKSPACE"},
-            }],
-        }).encode()
-        req = urllib.request.Request(
-            f"{host}/api/2.2/jobs/runs/submit",
-            data=body,
-            method="POST",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=10) as r:
-            resp = json.loads(r.read())
-            print(f"  Aggregation triggered: run_id={resp.get('run_id')}")
-    except Exception as e:
-        print(f"  Warning: could not trigger aggregation ({e}) — insights will update on next schedule")
 rekognition = boto3.client('rekognition')
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table('snaptrash-last-analyzed')
@@ -147,7 +113,7 @@ def lambda_handler(event, context):
             plastic_items_json=json.dumps([p.model_dump() for p in enriched_plastic]),
         )
         insert_scan(row)
-        _trigger_aggregation()  # fire-and-forget: 02_aggregations runs async
+        submit_aggregation_job("snaptrash-agg-lambda-trigger")  # fire-and-forget
 
         update_last_analyzed(restaurant_id, analyzed_key, new_labels, vision_result, similarity)
         print(f"✅ Full analysis completed for {restaurant_id}, similarity: {similarity}")

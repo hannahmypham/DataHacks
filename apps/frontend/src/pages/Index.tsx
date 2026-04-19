@@ -20,7 +20,7 @@ import type {
   LocalityAgg,
   LatestScan,
 } from "@/lib/api";
-import { getInsights, getLocality, getLatestScan } from "@/lib/api";
+import { getInsights, getLocality, getLatestScan, getWeeklySeries } from "@/lib/api";
 
 const RESTAURANT_ID = "demo-restaurant-001";
 const ZIP = "92101";
@@ -80,8 +80,8 @@ const mockLocality: LocalityAgg = {
   enzyme_alert: false,
 };
 
-// TODO: replace with live API call (7-day actual vs forecast time series, lbs)
-const weeklySeries = [
+// Fallback static data — overwritten at runtime by getWeeklySeries() API call
+let weeklySeries = [
   { day: "Mon", actual: 6.2, forecast: 6.5 },
   { day: "Tue", actual: 7.8, forecast: 7.2 },
   { day: "Wed", actual: 5.9, forecast: 6.8 },
@@ -91,8 +91,8 @@ const weeklySeries = [
   { day: "Sun", actual: 8.6, forecast: 9.0 },
 ];
 
-// TODO: replace with live API call (next-week daily forecast, lbs)
-const dailyForecast = [
+// Derived from weeklySeries × (forecast_food_kg / actual_total) ratio
+let dailyForecast = [
   { day: "Mon", value: 9.2 },
   { day: "Tue", value: 10.5 },
   { day: "Wed", value: 11.8 },
@@ -798,7 +798,7 @@ function GlobalSection() {
         <div className="overflow-hidden rounded-xl border border-signal-good/30">
           <iframe
             title="Composting Facilities Near You"
-            src="https://maps.google.com/maps?q=composting+facility+near+San+Diego+CA+92101&output=embed"
+            src={`https://maps.google.com/maps?q=composting+facility+near+San+Diego+CA+${ZIP}&output=embed`}
             width="100%"
             height="300"
             style={{ border: 0 }}
@@ -820,13 +820,14 @@ const Index = () => {
   const [, setTick] = useState(0);
   const [lastScan, setLastScan] = useState<LatestScan | null>(null);
 
-  // Insights + locality: refresh every 30s
+  // Insights + locality + weekly series: refresh every 30s
   useEffect(() => {
     const refresh = () => {
       Promise.all([
         getInsights(RESTAURANT_ID).catch(() => null),
         getLocality(ZIP).catch(() => null),
-      ]).then(([insight, locality]) => {
+        getWeeklySeries(RESTAURANT_ID).catch(() => null),
+      ]).then(([insight, locality, series]) => {
         if (insight) {
           Object.assign(mockInsight, insight);
           // Databricks returns numbers as strings — coerce all numeric fields
@@ -848,6 +849,24 @@ const Index = () => {
         }
         if (locality) {
           Object.assign(mockLocality, locality);
+        }
+        // Wire weekly series from API — compute forecast column from Prophet ratio
+        if (series && series.length > 0) {
+          const actualTotal = series.reduce((s, d) => s + d.actual, 0);
+          const forecastTotal = insight
+            ? Number(insight.forecast_food_kg ?? actualTotal)
+            : actualTotal;
+          const ratio = actualTotal > 0 ? forecastTotal / actualTotal : 1.0;
+          weeklySeries = series.map((d) => ({
+            day: d.day,
+            actual: d.actual,
+            forecast: parseFloat((d.actual * ratio).toFixed(2)),
+          }));
+          // Daily forecast for next week: same day-of-week pattern scaled by ratio
+          dailyForecast = series.map((d) => ({
+            day: d.day,
+            value: parseFloat((d.actual * ratio).toFixed(2)),
+          }));
         }
         setTick(t => t + 1);
       });

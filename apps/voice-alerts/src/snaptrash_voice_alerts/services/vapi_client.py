@@ -74,15 +74,21 @@ class VapiClient:
             print("Warning: Toll-free number detected; may fail with SIP 403.")
         return phone
 
-    def initiate_call(self, report: PlasticReportContext, target_phone: str | None = None) -> str | None:
-        """Initiate Vapi call with plastic report context. Returns call_id or None."""
+    def initiate_call(
+        self, report: PlasticReportContext, target_phone: str | None = None
+    ) -> tuple[str | None, str]:
+        """Initiate Vapi call with plastic report context.
+
+        Returns:
+            (call_id, alert_id) — call_id is None in test/skip mode.
+            alert_id is always set (row is logged to VOICE_ALERTS before the call).
+        """
         phone = self._normalize_phone(target_phone or self.default_phone)
-        # Create alert row first
         alert_id = str(uuid.uuid4())
         context_dict = report.model_dump()
         context_json = json.dumps(context_dict)
 
-        # Log to Databricks immediately
+        # Log to Databricks before the call so outcome can always be updated
         now = datetime.now(timezone.utc).isoformat()
         execute(
             f"""
@@ -92,7 +98,7 @@ class VapiClient:
             """,
             {
                 "id": alert_id,
-                "zip": report.locality,  # reuse zip field for locality
+                "zip": report.locality,
                 "nb": report.neighborhood,
                 "ts": now,
                 "vol": report.total_plastic_kg,
@@ -105,7 +111,7 @@ class VapiClient:
         if not self.configured or not self.assistant_id or not self.phone_number_id:
             print("⚠️ No Vapi config - skipping actual call (test mode). Logged to DB only.")
             execute(f"UPDATE {VOICE_ALERTS} SET status = 'skipped' WHERE alert_id = :id", {"id": alert_id})
-            return None
+            return None, alert_id
 
         payload = {
             "assistantId": self.assistant_id,
@@ -128,20 +134,19 @@ class VapiClient:
                 call_id = data.get("id")
                 if call_id:
                     print(f"✅ Call initiated: {call_id} to {phone[-4:]} (report for {report.neighborhood})")
-                    # Update with call_id
                     execute(
                         f"UPDATE {VOICE_ALERTS} SET call_id = :cid, status = 'calling' WHERE alert_id = :id",
                         {"cid": call_id, "id": alert_id},
                     )
-                    return call_id
-                return None
+                    return call_id, alert_id
+                return None, alert_id
         except httpx.HTTPError as e:
             print(f"❌ Vapi initiate failed: {e}")
             execute(
                 f"UPDATE {VOICE_ALERTS} SET status = 'failed', ended_reason = :reason WHERE alert_id = :id",
                 {"reason": str(e)[:200], "id": alert_id},
             )
-            return None
+            return None, alert_id
 
     def poll_call(self, call_id: str, max_polls: int = 60, poll_interval: int = 5) -> Dict[str, Any]:
         """Poll for call status and transcript (per VAPI guide: handle 429, ended states)."""

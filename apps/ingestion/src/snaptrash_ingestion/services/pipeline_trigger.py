@@ -57,10 +57,10 @@ def trigger():
 
     host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
     token = os.environ.get("DATABRICKS_TOKEN", "")
-    user = os.environ.get("DATABRICKS_USER", "ara023@ucsd.edu")
+    user = os.environ.get("DATABRICKS_USER", "")
 
-    if not host or not token:
-        logger.warning("[pipeline_trigger] DATABRICKS_HOST/TOKEN not set — skipping auto-trigger")
+    if not host or not token or not user:
+        logger.warning("[pipeline_trigger] DATABRICKS_HOST/TOKEN/USER not set — skipping auto-trigger")
         return
 
     with _lock:

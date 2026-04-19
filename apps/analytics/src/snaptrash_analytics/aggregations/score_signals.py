@@ -25,7 +25,13 @@ def signal1_food_vs_zip(restaurant_food_kg: float, zip_avg_food_kg: float) -> fl
 
 
 def signal2_banned_harmful_plastics(ban_flag_count: int, harmful_count: int) -> float:
-    """Banned + harmful plastics (20%). Banned 25 pts each, harmful 10 pts each."""
+    """Banned + harmful plastics (20%).
+
+    Penalty weights:
+    - 25 pts per banned item  — higher weight because banned items are a legal violation (CA SB-54)
+    - 10 pts per harmful item — non-banned but releases carcinogens (IARC Group 2B / WHO 2021)
+    Score floor = 0.
+    """
     plastic_penalty = (int(ban_flag_count) * 25) + (int(harmful_count) * 10)
     return max(0.0, 100.0 - plastic_penalty)
 
@@ -52,7 +58,15 @@ def signal5_week_over_week_reduction(
     this_week_avg: float | None,
     last_week_avg: float | None,
 ) -> float:
-    """WoW total weight (food + plastic) trend (20%). No prior week → 50 (neutral)."""
+    """WoW total weight (food + plastic) trend (20%).
+
+    Cold-start (no prior week) → 50.0 (neutral; neither rewarded nor penalised).
+    Scoring curve:
+    - ≥20% reduction → 100 (full marks; 20% is the EPA voluntary goal for commercial food waste)
+    - 0–20% reduction → 50–100 linear (slope: 2.5 pts per 1% reduction)
+    - 0% change → 50 (neutral)
+    - Increase → 0–50 linear (penalised symmetrically; floor = 0)
+    """
     if last_week_avg is None:
         return 50.0
     last = float(last_week_avg)
@@ -62,7 +76,7 @@ def signal5_week_over_week_reduction(
     if last <= 0.0:
         return 50.0
     pct_reduction = (last - this) / last * 100.0
-    if pct_reduction >= 20.0:
+    if pct_reduction >= 20.0:   # EPA Sustainable Materials Management 20% goal
         return 100.0
     if pct_reduction > 0.0:
         return 50.0 + (pct_reduction * 2.5)

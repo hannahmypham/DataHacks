@@ -1,101 +1,182 @@
-# SnapTrash
+# SnapTrash — Restaurant Waste Intelligence Platform
 
-Restaurant waste vision + analytics. See `snaptrash-plan.md` for full architecture.
+Real-time CV + LLM pipeline that scans commercial waste bins, classifies food and plastic waste, scores sustainability (1–4 scale), and triggers voice + email alerts when plastic thresholds are exceeded.
 
-## Repo Layout
+**DataHacks 2025 Submission**
+
+---
+
+## Architecture
 
 ```
-SmartWaste/
-├── apps/
-│   ├── ingestion/    # Person A — S3 + Groq Vision + FastAPI + Delta writes (Stages 1-5)
-│   ├── analytics/    # Person B — MSW load + SQL agg + Prophet + thresholds (Stage 6)
-│   └── frontend/     # Vite + React + TS + Tailwind dashboard (later)
-├── packages/
-│   └── common/       # shared lib — Databricks client, schemas, table DDL
-├── scripts/          # bootstrap_databricks, seed_fake_scans, run_dev
-├── notebooks/        # Databricks notebooks (analytics app)
-└── data/             # gitignored — Dryad CSV, scraped JSON
+iOS Camera
+  │  presigned PUT
+  ▼
+S3 (snaptrash-raw-incoming)
+  │  Lambda trigger
+  ▼
+AWS Lambda
+  ├─ Rekognition  — dedup (similarity > 0.85 → skip re-analysis)
+  └─ Grok Vision  — classify food + plastic items
+       │  enriched ScanRow
+       ▼
+  Databricks Delta (snaptrash.scans)
+       │  02_aggregations + 03_prophet_forecast notebooks
+       ▼
+  INSIGHTS + LOCALITY_AGG tables
+  (sustainability score 1–4, Prophet forecast, ZIP ranking)
+       │
+       ▼
+FastAPI :8000  (/insights, /locality, /weekly-series, /scan/latest)
+       │  Vite proxy /api
+       ▼
+React Dashboard  (shadcn/ui + recharts, 30s live refresh)
+
+Voice Alerts: Vapi.ai call if plastic > 150 kg/week (locality)
+Email Alerts: SMTP if plastic > 150 kg/week (dedup: 1 email/ZIP/7 days)
 ```
 
-## Integration Contract
+---
 
-The **only coupling** between Person A and Person B is the Delta tables defined in
-`packages/common/src/snaptrash_common/tables.py` and pydantic models in `schemas.py`.
+## Quickstart
 
-| Person | Writes to | Reads from |
-|---|---|---|
-| A (ingestion) | `snaptrash.scans` | — |
-| B (analytics) | `snaptrash.insights`, `snaptrash.locality_agg`, `snaptrash.enzyme_alerts` | `snaptrash.scans`, `snaptrash.msw_baseline` |
+### Prerequisites
+- Python 3.11+, Node 18+
+- Databricks workspace with SQL warehouse
+- AWS account (S3 + Lambda + Rekognition + DynamoDB)
+- xAI API key (Grok Vision)
 
-Stick to those schemas → integration is automatic.
-
-## Quick Start
+### 1. Environment
 
 ```bash
-# 1. Clone + env
-git clone <repo>
-cd SmartWaste
-cp .env.example .env   # fill in DATABRICKS_TOKEN, AWS keys, GROQ_API_KEY, etc.
-
-# 2. Pick your app
-cd apps/ingestion        # Person A
-# or
-cd apps/analytics        # Person B
-
-uv sync                  # installs deps + editable common pkg
-
-# 3. Bootstrap Databricks tables (once, after .env is filled)
-cd ../..
-uv run --project apps/analytics python scripts/bootstrap_databricks.py
-
-# 4. Run
-# Ingestion API:
-uv run --project apps/ingestion uvicorn snaptrash_ingestion.main:app --reload --port 8000
-
-# Analytics jobs (one-off):
-uv run --project apps/analytics python -m snaptrash_analytics.ingest.load_msw_dryad
-uv run --project apps/analytics python -m snaptrash_analytics.aggregations.locality_agg
-uv run --project apps/analytics python -m snaptrash_analytics.forecasting.prophet_forecast
+cp .env.example .env
+# Fill in all values — see .env.example for descriptions
 ```
 
-## Branches
+Required vars:
+```
+DATABRICKS_HOST=https://your-workspace.azuredatabricks.net
+DATABRICKS_TOKEN=dapi...
+DATABRICKS_WAREHOUSE_ID=...
+DATABRICKS_USER=you@email.com
+DATABRICKS_CATALOG=workspace
+S3_BUCKET=snaptrash-bins
+S3_RAW_BUCKET=snaptrash-raw-incoming
+XAI_API_KEY=xai-...
+```
 
-- `main` — integration / demos
-- `dev/ingestion` — Person A
-- `dev/analytics` — Person B
+### 2. Bootstrap Databricks tables
 
-Merge into `main` when integration milestone is hit.
+```bash
+cd scripts
+python bootstrap_databricks.py
+python seed_fake_scans.py   # optional: 280 synthetic scans for demo
+```
 
-## MCP Servers
+### 3. Start backend
 
-`.claude/settings.json` configures:
-- **databricks-mcp** — query / inspect Delta Lake from Claude
-- **firecrawl-mcp** — run Firecrawl scrape jobs from Claude
+```bash
+cd apps/ingestion
+pip install -e ../../packages/common -e .
+uvicorn snaptrash_ingestion.main:app --reload --port 8000
+```
 
-Frontend skills available at user level: `ui-ux-pro-max`, `21st-dev-magic`, `shadcn-ui`, framer.
+API docs: `http://localhost:8000/docs`
 
-## Secrets Checklist
+### 4. Start frontend
 
-| Key | Source |
-|---|---|
-| `DATABRICKS_HOST` / `DATABRICKS_TOKEN` | Databricks UI → User Settings → Developer → Access tokens |
-| `DATABRICKS_WAREHOUSE_ID` | Databricks UI → SQL Warehouses → click warehouse → Connection details |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | AWS IAM user with S3 read/write on `snaptrash-bins` |
-| `GROQ_API_KEY` | https://console.groq.com/keys |
-| `FIRECRAWL_API_KEY` | https://www.firecrawl.dev/app |
-| `SENDGRID_API_KEY` | https://app.sendgrid.com/settings/api_keys |
+```bash
+cd apps/frontend
+npm install
+npm run dev   # http://localhost:5173
+```
 
-## Grok / Cursor Agent Skills & Rules
+Vite proxies `/api/*` → `http://localhost:8000`.
 
-The following **project-specific skills** (in `.cursor/skills/`) and rules (in `.cursor/rules/`) have been added from the Cursor marketplace/global skills, customized for SnapTrash:
+### 5. Run analytics (Databricks)
 
-- `snaptrash` + `snaptrash-core.mdc` (core architecture, data flow, monorepo, schemas, removed barcode/manufacturer features).
-- `databricks-snaptrash` — Databricks CLI/SDK, tables (`scans`, `insights`, `locality_agg`, `enzyme_alerts`), Prophet, bootstrap, MCP, analytics jobs (adapts global databricks skill).
-- `firecrawl-snaptrash` — Scraping EPA plastics, labs, BioCycle (adapts global firecrawl skill; always use for web/research tasks).
-- `ui-ux-snaptrash` — Applies global **UI/UX Pro Max** (palettes, styles, charts, accessibility, shadcn/ui), **Framer Motion** animations (already in frontend deps), and **21st.dev** magic components to the dashboard (scan/results cards, Recharts + animations, Mapbox, gamification). Follows exact screens from the plan.
+Upload notebooks from `apps/analytics/notebooks/` to your Databricks workspace at `/Users/{DATABRICKS_USER}/snaptrash/`. Run manually or let `pipeline_trigger` auto-submit after each scan (90s cooldown).
 
-These are bundled with the repo so every clone gets the full Grok/Cursor intelligence for this project. They reference the global marketplace skills while adding SnapTrash-specific examples, tables, UI mocks, and conventions.
+### 6. Voice + email alerts (optional)
 
-Review `DETAILED-OVERVIEW.md` and the individual skill files. The agent will now automatically apply the right combination (e.g. databricks + firecrawl for analytics jobs, ui-ux for frontend changes).
+```bash
+# Set in .env: VAPI_API_KEY, VAPI_ASSISTANT_ID, VAPI_PHONE_NUMBER_ID
+#              DEFAULT_ALERT_PHONE, SMTP_USER, SMTP_PASS
+#              ALERT_FROM_EMAIL, ALERT_TO_EMAILS
 
-New contributors: Run `ls -R .cursor` to explore.
+cd apps/voice-alerts
+pip install -e ../../packages/common -e .
+python -m snaptrash_voice_alerts.trigger
+```
+
+---
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Service health check |
+| POST | `/scan` | Upload image (multipart) → full pipeline |
+| GET | `/upload-url` | Presigned S3 PUT URL for iOS direct upload |
+| GET | `/scan/latest/{restaurant_id}` | Most recent scan row |
+| GET | `/insights/{restaurant_id}` | 7-day aggregates + score + Prophet forecast |
+| GET | `/locality/{zip}` | ZIP-level plastic + sustainability stats |
+| GET | `/weekly-series/{restaurant_id}` | Day-of-week actual food kg (past 7 days) |
+
+---
+
+## Sustainability Score (1–4 scale)
+
+Five equally-weighted signals (20% each):
+
+| Signal | Measures | Reference |
+|--------|----------|-----------|
+| S1 | Food kg vs ZIP average (1% rule) | EPA MSW 2022 |
+| S2 | Banned + harmful plastic penalty | CA SB-54, IARC Group 2B |
+| S3 | Recyclability rate (PET/HDPE/PP) | EPA MSW 2022 |
+| S4 | Total plastic kg vs ZIP average | ZIP rolling 7d |
+| S5 | Week-over-week reduction | EPA 20% voluntary goal |
+
+`score = 1.0 + (raw_0_100 / 100) × 3.0`  →  clamped to [1.0, 4.0]
+
+**Tiers:** Thriving Forest ≥3.7 · Full Tree ≥3.4 · Growing Plant ≥3.1 · Small Sprout ≥2.8 · Seed ≥2.5 · Bare Root <2.5
+
+---
+
+## Project Structure
+
+```
+apps/
+  ingestion/        FastAPI service — scan ingestion + analytics routes
+  analytics/        Databricks notebooks + Python aggregation scripts
+  frontend/         Vite + React + shadcn/ui live dashboard
+  voice-alerts/     Vapi.ai voice calls + SMTP email alerts
+packages/
+  common/           Shared schemas, env, table DDL, Databricks client, jobs API
+infrastructure/
+  lambda-detector/  AWS Lambda S3 trigger (Rekognition dedup + Grok pipeline)
+scripts/
+  bootstrap_databricks.py   Create all Delta tables
+  seed_fake_scans.py        Generate 280 synthetic demo rows
+  voice_alert_call.py       Manual alert trigger
+data/
+  epa_banned.json   Banned plastic polymers by state (SB-54, SB-270, NY S1185, WA SB 5022…)
+```
+
+---
+
+## Alert Thresholds
+
+| Alert | Threshold | Dedup |
+|-------|-----------|-------|
+| Locality plastic | >150 kg/week across ZIP | 1 email/ZIP/7 days (EMAIL_ALERTS table) |
+| Restaurant plastic | >30 kg/week per restaurant | per-run only |
+| Rekognition dedup | similarity >0.85 | per-image (DynamoDB) |
+
+---
+
+## Key Dependencies
+
+**Backend:** FastAPI · Pydantic · httpx · databricks-sql-connector · boto3 · Prophet (Databricks)  
+**Frontend:** React 18 · Vite · shadcn/ui · Recharts · TanStack Query · Tailwind CSS  
+**Infrastructure:** AWS Lambda · S3 · Rekognition · DynamoDB · Databricks Delta Lake · Vapi.ai
