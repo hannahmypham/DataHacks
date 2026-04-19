@@ -39,7 +39,7 @@ const mockScan = {
   forecast_food_kg: 27.7,
   weekly_plastic_count: 25,
   weekly_dollar_waste: 42.0,
-  forecast_next_week: 48.0,
+  forecast_dollar_waste: 48.0,
   plastic_items: [
     { name: "Single-use cups", harmful: false, banned: false },
     { name: "Straws", harmful: false, banned: true },
@@ -844,7 +844,7 @@ const Index = () => {
           if (insight.weekly_dollar_waste != null) mockScan.weekly_dollar_waste = Number(insight.weekly_dollar_waste);
           if (insight.weekly_plastic_count != null) mockScan.weekly_plastic_count = Number(insight.weekly_plastic_count);
           if (insight.forecast_food_kg != null) mockScan.forecast_food_kg = Number(insight.forecast_food_kg);
-          if (insight.forecast_dollar_waste != null) mockScan.forecast_next_week = Number(insight.forecast_dollar_waste);
+          if (insight.forecast_dollar_waste != null) mockScan.forecast_dollar_waste = Number(insight.forecast_dollar_waste);
         }
         if (locality) {
           Object.assign(mockLocality, locality);
