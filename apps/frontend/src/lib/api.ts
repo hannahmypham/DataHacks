@@ -49,22 +49,50 @@ export type ScanResponse = {
 
 export type Insight = {
   restaurant_id: string;
+  computed_at?: string;
   weekly_dollar_waste: number;
-  forecast_next_week: number;
+  weekly_food_kg?: number;
+  weekly_plastic_count?: number;
+  forecast_next_week?: number;
+  forecast_dollar_waste?: number;
+  forecast_food_kg?: number;
+  forecast_plastic_count?: number;
   locality_percentile: number;
+  locality_percentile_pct?: number;
+  better_than_count?: number;
+  zip_restaurant_count?: number;
+  sustainability_score?: number;
+  badge_tier?: string;
+  tier_emoji?: string;
+  score_feedback_message?: string;
   top_waste_category: string;
+  peak_waste_day?: string;
+  peak_waste_day_kg?: number;
   recommendation: string;
   co2_avoided: number;
+  shelf_life_min_days?: number;
+  shelf_life_avg_days?: number;
+  at_risk_kg_24h?: number;
+  nearest_facility_name?: string;
+  nearest_facility_km?: number;
+  harmful_plastic_count?: number;
+  ban_flag_count?: number;
+  signals?: Record<string, any>;
+  enzyme_alert?: boolean;
 };
 
 export type LocalityAgg = {
   zip: string;
   neighborhood: string;
+  computed_at?: string;
   total_pet_kg: number;
   total_ps_count: number;
   harmful_count: number;
   active_restaurants: number;
   enzyme_alert: boolean;
+  food_waste_per_capita_kg?: number;
+  avg_sustainability_score?: number;
+  score_feedback_message?: string;
 };
 
 // ---- endpoints ----
