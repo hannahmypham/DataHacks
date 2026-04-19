@@ -98,6 +98,24 @@ def _extract_json(text: str) -> dict:
         return json.loads(m.group(0))
 
 
+def _to_data_uri(image_url: str) -> str:
+    """
+    Download image bytes from URL and convert to base64 data URI.
+    Avoids Grok having to fetch S3 presigned URLs (which may 403).
+    """
+    import urllib.request
+    try:
+        with urllib.request.urlopen(image_url, timeout=15) as r:
+            raw = r.read()
+            ct = r.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
+    except Exception as exc:
+        logger.warning(f"Could not fetch image for base64 conversion ({exc}); falling back to URL")
+        return image_url
+    import base64
+    b64 = base64.b64encode(raw).decode()
+    return f"data:{ct};base64,{b64}"
+
+
 def analyze_image(image_url: str) -> GrokVisionResult:
     """Analyze waste bin image using Grok (xAI) Vision model.
 
@@ -106,7 +124,11 @@ def analyze_image(image_url: str) -> GrokVisionResult:
     """
     start = perf_counter()
     try:
-        logger.info(f"Grok Vision starting call with model={settings.GROK_VISION_MODEL}, URL={image_url[:60]}...")
+        # Convert to base64 data URI so Grok doesn't need to fetch S3 (may 403)
+        data_uri = _to_data_uri(image_url)
+        is_b64 = data_uri.startswith("data:")
+        logger.info(f"Grok Vision starting call with model={settings.GROK_VISION_MODEL}, "
+                    f"{'base64' if is_b64 else 'URL'}={image_url[:60]}...")
 
         resp = client().chat.completions.create(
             model=settings.GROK_VISION_MODEL,
@@ -114,7 +136,7 @@ def analyze_image(image_url: str) -> GrokVisionResult:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "image_url", "image_url": {"url": image_url}},
+                        {"type": "image_url", "image_url": {"url": data_uri}},
                         {"type": "text", "text": PROMPT},
                     ],
                 }
