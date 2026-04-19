@@ -18,6 +18,32 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scan", tags=["scan"])
 
 
+@router.post("/presign-upload")
+async def presign_upload(
+    restaurant_id: str = Form(...),
+    content_type: str = Form("image/jpeg"),
+):
+    """Generate presigned URL for direct S3 upload to raw bucket."""
+    try:
+        timestamp = int(time.time())
+        key = f"{restaurant_id}/{timestamp}.jpg"
+        
+        presigned_url = s3_client.generate_presigned_upload_url(
+            key=key,
+            content_type=content_type,
+            expires=3600
+        )
+        
+        return {
+            "upload_url": presigned_url,
+            "key": key,
+            "bucket": settings.S3_RAW_BUCKET or settings.S3_BUCKET,
+        }
+    except Exception as e:
+        logger.error(f"Failed to generate presigned URL: {e}")
+        raise HTTPException(500, f"Failed to generate upload URL: {str(e)}")
+
+
 @router.post("")
 async def create_scan(
     image: UploadFile = File(...),
