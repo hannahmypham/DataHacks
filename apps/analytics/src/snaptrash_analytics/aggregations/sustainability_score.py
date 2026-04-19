@@ -27,7 +27,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from snaptrash_common.databricks_client import execute, fetch_all
-from snaptrash_common.geo import haversine
+from snaptrash_common.geo import haversine, KG_TO_LBS
 from snaptrash_common.tables import (
     SCANS_UNIFIED, INSIGHTS, GOLD_COMPOSTING, GOLD_CA_CAPACITY,
     GOLD_SD_COMMERCIAL, GOLD_SD_RESTAURANTS,
@@ -359,15 +359,15 @@ def main():
                 delta_pct = (s["food_kg"] / sd_avg_weekly_kg - 1.0) * 100
                 if delta_pct < -5:
                     full_msg += (
-                        f" Weekly food waste ({s['food_kg']:.0f} kg) is "
+                        f" Weekly food waste ({s['food_kg'] * KG_TO_LBS:.0f} lbs) is "
                         f"{abs(delta_pct):.0f}% below the typical SD restaurant "
-                        f"({sd_avg_weekly_kg:.0f} kg)."
+                        f"({sd_avg_weekly_kg * KG_TO_LBS:.0f} lbs)."
                     )
                 elif delta_pct > 5:
                     full_msg += (
-                        f" Weekly food waste ({s['food_kg']:.0f} kg) is "
+                        f" Weekly food waste ({s['food_kg'] * KG_TO_LBS:.0f} lbs) is "
                         f"{delta_pct:.0f}% above the typical SD restaurant "
-                        f"({sd_avg_weekly_kg:.0f} kg)."
+                        f"({sd_avg_weekly_kg * KG_TO_LBS:.0f} lbs)."
                     )
             if s["facility_name"] and s["facility_km"] is not None:
                 full_msg += (

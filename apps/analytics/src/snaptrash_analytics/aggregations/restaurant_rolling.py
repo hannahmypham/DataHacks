@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from dateutil import parser as dtparser
 
 from snaptrash_common.databricks_client import execute, fetch_all
+from snaptrash_common.geo import KG_TO_LBS
 from snaptrash_common.tables import (
     SCANS_UNIFIED, INSIGHTS, GOLD_WCS, GOLD_FOOD_PRICES, GOLD_SHELF_LIFE,
 )
@@ -389,7 +390,7 @@ def main():
         min_rem = shelf_stats.get("min_remaining_days")
         if at_risk_kg >= 1.0:
             rec = (
-                f"{at_risk_kg:.1f} kg expiring within 24h — prioritize those items. "
+                f"{at_risk_kg * KG_TO_LBS:.1f} lbs expiring within 24h — prioritize those items. "
                 + rec
             )
         elif isinstance(min_rem, (int, float)) and min_rem <= 2.0:

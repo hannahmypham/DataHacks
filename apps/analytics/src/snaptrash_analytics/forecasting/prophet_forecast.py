@@ -15,6 +15,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pandas as pd
+from snaptrash_common.geo import KG_TO_LBS
 from prophet import Prophet
 
 from snaptrash_common.databricks_client import execute, fetch_all
@@ -212,7 +213,7 @@ def main():
             delta_pct = ((food_7d - last_food) / max(last_food, 0.001)) * 100
             direction = "above" if delta_pct > 0 else "below"
             forecast_rec = (
-                f"Forecast next 7 days: {food_7d:.1f} kg food waste "
+                f"Forecast next 7 days: {food_7d * KG_TO_LBS:.1f} lbs food waste "
                 f"({abs(delta_pct):.0f}% {direction} last week). "
                 f"Projected wastage: ${dollar_7d:.0f}."
             )
@@ -241,7 +242,7 @@ def main():
             })
 
             print(
-                f"  {rid[:20]:20s} | food: {food_7d:6.1f} kg "
+                f"  {rid[:20]:20s} | food: {food_7d * KG_TO_LBS:6.1f} lbs "
                 f"| ${dollar_7d:6.0f} | plastic: {int(plastic_7d):4d}"
             )
 

@@ -1,6 +1,10 @@
-"""Shared geographic utilities."""
+"""Shared geographic utilities and unit conversion constants."""
 from __future__ import annotations
 import math
+
+# Weight conversion: all internal computation uses kg (benchmarks/WCS data are in kg).
+# Use KG_TO_LBS only for user-facing display strings.
+KG_TO_LBS: float = 2.20462
 
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
