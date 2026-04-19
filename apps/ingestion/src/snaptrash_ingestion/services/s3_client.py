@@ -43,6 +43,34 @@ def presign_get(key: str, expires: int = 3600) -> str:
     )
 
 
+RAW_BUCKET = "snaptrash-raw-incoming"
+
+
+def presign_put_raw(
+    restaurant_id: str,
+    zip_code: str,
+    neighborhood: str,
+    ts: int,
+    content_type: str = "image/jpeg",
+    expires: int = 300,
+) -> tuple[str, str]:
+    """Return (presigned PUT URL, S3 key) for direct iOS → S3 upload.
+
+    Key encodes metadata as path segments so Lambda can parse without head_object.
+    Format: {restaurant_id}/{zip}/{neighborhood_urlencoded}/{ts}.jpg
+    """
+    from urllib.parse import quote
+    ext = "jpg" if "jpeg" in content_type else content_type.split("/")[-1]
+    nb_encoded = quote(neighborhood or "unknown", safe="")
+    key = f"{restaurant_id}/{zip_code}/{nb_encoded}/{ts}.{ext}"
+    url = s3().generate_presigned_url(
+        "put_object",
+        Params={"Bucket": RAW_BUCKET, "Key": key, "ContentType": content_type},
+        ExpiresIn=expires,
+    )
+    return url, key
+
+
 def get_object_bytes(key: str, bucket: str | None = None) -> bytes:
     """Get raw bytes from S3 object (used by Lambda for comparison)."""
     b = bucket or settings.S3_BUCKET

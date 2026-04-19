@@ -6,7 +6,7 @@ If different, copies to analyzed bucket and triggers full Grok analysis.
 from __future__ import annotations
 import json
 import boto3
-from urllib.parse import unquote_plus
+from urllib.parse import unquote_plus, unquote
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -33,7 +33,13 @@ def lambda_handler(event, context):
     for record in event.get('Records', []):
         bucket = record['s3']['bucket']['name']
         key = unquote_plus(record['s3']['object']['key'])
-        restaurant_id = key.split('/')[0] if '/' in key else 'unknown'
+
+        # Key format: {restaurant_id}/{zip}/{neighborhood_urlencoded}/{ts}.ext
+        # Falls back gracefully for old-format keys: {restaurant_id}/{ts}.ext
+        parts = key.split('/')
+        restaurant_id = parts[0] if len(parts) >= 1 else 'unknown'
+        zip_code = parts[1] if len(parts) >= 4 else '00000'
+        neighborhood = unquote(parts[2]) if len(parts) >= 4 else 'unknown'
 
         # Get image bytes using shared helper
         image_bytes = get_object_bytes(key, bucket=bucket)
@@ -82,8 +88,8 @@ def lambda_handler(event, context):
         row = ScanRow(
             scan_id=scan_id,
             restaurant_id=restaurant_id,
-            zip="92101",  # TODO: extract from S3 object metadata in prod
-            neighborhood="Downtown",
+            zip=zip_code,
+            neighborhood=neighborhood,
             timestamp=datetime.now(timezone.utc),
             food_kg=food_kg,
             compostable_kg=compostable_kg,

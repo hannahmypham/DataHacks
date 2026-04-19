@@ -4,7 +4,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 import logging
 from time import perf_counter
 
@@ -18,30 +18,27 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scan", tags=["scan"])
 
 
-@router.post("/presign-upload")
-async def presign_upload(
-    restaurant_id: str = Form(...),
-    content_type: str = Form("image/jpeg"),
+@router.get("/upload-url")
+def get_upload_url(
+    restaurant_id: str = Query(...),
+    zip: str = Query(...),
+    neighborhood: str = Query(""),
+    content_type: str = Query("image/jpeg"),
 ):
-    """Generate presigned URL for direct S3 upload to raw bucket."""
-    try:
-        timestamp = int(time.time())
-        key = f"{restaurant_id}/{timestamp}.jpg"
-        
-        presigned_url = s3_client.generate_presigned_upload_url(
-            key=key,
-            content_type=content_type,
-            expires=3600
-        )
-        
-        return {
-            "upload_url": presigned_url,
-            "key": key,
-            "bucket": settings.S3_RAW_BUCKET or settings.S3_BUCKET,
-        }
-    except Exception as e:
-        logger.error(f"Failed to generate presigned URL: {e}")
-        raise HTTPException(500, f"Failed to generate upload URL: {str(e)}")
+    """Return a presigned S3 PUT URL for direct iOS → S3 upload.
+
+    iOS calls this first, then PUTs the image directly to the returned URL.
+    Lambda fires on PUT to snaptrash-raw-incoming and runs the full pipeline.
+    """
+    ts = int(time.time())
+    upload_url, key = s3_client.presign_put_raw(
+        restaurant_id=restaurant_id,
+        zip_code=zip,
+        neighborhood=neighborhood,
+        ts=ts,
+        content_type=content_type,
+    )
+    return {"upload_url": upload_url, "key": key, "expires_in": 300}
 
 
 @router.post("")
