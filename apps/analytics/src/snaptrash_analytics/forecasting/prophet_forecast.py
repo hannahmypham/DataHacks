@@ -22,16 +22,21 @@ from snaptrash_common.databricks_client import execute, fetch_all
 from snaptrash_common.tables import SCANS_UNIFIED, INSIGHTS, GOLD_SD_DISPOSAL
 
 def _setup_mlflow():
-    """Create or get MLflow experiment — tolerates missing parent dirs."""
-    exp_name = "/Users/ara023@ucsd.edu/snaptrash/prophet_v2"
-    try:
-        mlflow.set_experiment(exp_name)
-    except Exception:
+    """Create or get MLflow experiment — tolerates missing parent dirs or permission errors."""
+    # Use /Shared/ so any workspace token can read/write regardless of user.
+    for exp_name in ("/Shared/snaptrash/prophet_v2", "/Users/ara023@ucsd.edu/snaptrash/prophet_v2"):
         try:
-            exp_id = mlflow.create_experiment(exp_name)
-            mlflow.set_experiment(experiment_id=exp_id)
-        except Exception as e:
-            print(f"  MLflow experiment setup warning: {e} — continuing without tracking")
+            mlflow.set_experiment(exp_name)
+            break
+        except Exception:
+            try:
+                exp_id = mlflow.create_experiment(exp_name)
+                mlflow.set_experiment(experiment_id=exp_id)
+                break
+            except Exception:
+                continue
+    else:
+        print("  MLflow experiment setup failed — continuing without tracking")
     try:
         mlflow.autolog(silent=True)
     except Exception:
