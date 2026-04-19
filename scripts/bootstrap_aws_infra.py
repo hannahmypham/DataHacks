@@ -115,16 +115,19 @@ def main():
         package_dir = f"{tmpdir}/package"
         os.makedirs(package_dir, exist_ok=True)
 
-        # Install dependencies
+        # Install dependencies (no --no-deps: openai needs httpx/anyio transitively)
         subprocess.check_call([
-            'pip', 'install', '-t', package_dir, 'openai', 'pillow', 'imagehash', '--no-deps', '--no-compile'
+            'pip', 'install', '-t', package_dir,
+            'openai', 'pydantic', 'pydantic-settings', 'databricks-sdk',
+            'boto3', 'python-dateutil',
         ])
 
         # Copy our code
         shutil.copytree('infrastructure/lambda-detector', package_dir, dirs_exist_ok=True)
-        shutil.copytree('packages/common', f"{package_dir}/snaptrash_common", dirs_exist_ok=True)
-        shutil.copytree('apps/ingestion/src/snaptrash_ingestion/services', f"{package_dir}/snaptrash_ingestion/services", dirs_exist_ok=True)
-        shutil.copytree('apps/ingestion/src/snaptrash_ingestion/writers', f"{package_dir}/snaptrash_ingestion/writers", dirs_exist_ok=True)
+        # snaptrash_common: copy the actual package source, not the project root
+        shutil.copytree('packages/common/src/snaptrash_common', f"{package_dir}/snaptrash_common", dirs_exist_ok=True)
+        # snaptrash_ingestion: copy entire package so __init__.py + all submodules are present
+        shutil.copytree('apps/ingestion/src/snaptrash_ingestion', f"{package_dir}/snaptrash_ingestion", dirs_exist_ok=True)
 
         # Zip
         zip_path = f"{tmpdir}/lambda.zip"
@@ -150,7 +153,7 @@ def main():
             Role=role_arn,
             Handler=handler_path,
             Code={'ZipFile': zip_content},
-            Timeout=30,
+            Timeout=300,
             MemorySize=512,
             Environment={
                 'Variables': {
@@ -193,6 +196,7 @@ def main():
         }
         lambda_client.update_function_configuration(
             FunctionName=function_name,
+            Timeout=300,
             Environment={'Variables': env_vars}
         )
         print("✅ Updated Lambda environment variables")
