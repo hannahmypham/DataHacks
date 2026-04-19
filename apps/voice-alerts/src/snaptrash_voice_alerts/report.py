@@ -72,7 +72,11 @@ def generate_plastic_report(zip_code: Optional[str] = None) -> List[PlasticRepor
 
     # Query for high plastic volume (extend locality_agg or direct from scans_unified for accuracy)
     # Prefer recent 7d aggregates; add total_plastic_kg if not in locality_agg
-    zip_filter = f"AND zip = '{zip_code}'" if zip_code else ""
+    params: dict = {}
+    zip_filter = ""
+    if zip_code:
+        zip_filter = "AND zip = :zip_code"
+        params["zip_code"] = zip_code
     sql = f"""
     SELECT
         ANY_VALUE(zip)                              AS zip,
@@ -90,7 +94,7 @@ def generate_plastic_report(zip_code: Optional[str] = None) -> List[PlasticRepor
     ORDER BY total_plastic_kg DESC
     """
 
-    rows = fetch_all(sql)
+    rows = fetch_all(sql, params or None)
     reports = []
     for row in rows:
         report = PlasticReportContext(

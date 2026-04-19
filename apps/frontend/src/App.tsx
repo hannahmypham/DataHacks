@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Insight, LocalityAgg } from "./lib/api";
+import { getInsights, getLocality, getWeeklySeries } from "./lib/api";
 import { cn } from "./lib/cn";
 
 const RESTAURANT_ID = "test-restaurant-001";
@@ -19,8 +20,8 @@ const MOCK_INSIGHTS: Insight = {
   locality_percentile: 0.78,
   better_than_count: 37,
   zip_restaurant_count: 47,
-  sustainability_score: 84,
-  badge_tier: "Gold",
+  sustainability_score: 3.5,
+  badge_tier: "Growing Plant",
   score_feedback_message:
     "Better than 78% of restaurants in your ZIP. Keep reducing single-use plastics!",
   top_waste_category: "Plastic",
@@ -624,8 +625,44 @@ const FoodDecoSVG = ({ active }: { active: boolean }) => (
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const insights = MOCK_INSIGHTS;
-  const locality = MOCK_LOCALITY;
+  const [insights, setInsights] = useState<Insight>(MOCK_INSIGHTS);
+  const [locality, setLocality] = useState<LocalityAgg>(MOCK_LOCALITY);
+  const [weeklySeries, setWeeklySeries] = useState(WEEKLY_SERIES);
+  const [demoMode, setDemoMode] = useState(false);
+
+  // Fetch real data; fall back to mock on error and show demo banner
+  useEffect(() => {
+    getInsights(RESTAURANT_ID)
+      .then((data) => setInsights(data))
+      .catch((err) => { console.warn("[SnapTrash] insights unavailable, using demo data:", err); setDemoMode(true); });
+
+    getLocality(ZIP)
+      .then((data) => setLocality(data))
+      .catch((err) => { console.warn("[SnapTrash] locality unavailable, using demo data:", err); setDemoMode(true); });
+
+    // Build weekly sparkline: actuals from scans, forecast derived from Prophet ratio
+    getWeeklySeries(RESTAURANT_ID)
+      .then((days) => {
+        if (!days.length) return;
+        // Will be refined once insights loaded — use ratio: forecast / actual total
+        setWeeklySeries(
+          days.map((d) => ({ day: d.day, actual: d.actual, forecast: d.actual }))
+        );
+        // Once insights also loads, recompute forecast column via ratio
+        getInsights(RESTAURANT_ID).then((ins) => {
+          const actualTotal = days.reduce((s, d) => s + d.actual, 0);
+          const ratio = actualTotal > 0 ? (ins.forecast_food_kg ?? actualTotal) / actualTotal : 1;
+          setWeeklySeries(
+            days.map((d) => ({
+              day: d.day,
+              actual: d.actual,
+              forecast: parseFloat((d.actual * ratio).toFixed(2)),
+            }))
+          );
+        }).catch(() => {/* keep series without forecast scaling */});
+      })
+      .catch((err) => console.warn("[SnapWaste] weekly-series unavailable, using mock:", err));
+  }, []);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [activeScreen, setActiveScreen] = useState(1);
@@ -654,7 +691,7 @@ export default function App() {
   };
 
   // Data derivations from Insight schema
-  const score = insights.sustainability_score ?? 84;
+  const score = insights.sustainability_score ?? 3.5;
   const badge = insights.badge_tier ?? "Gold";
   const dollars = Math.round(insights.weekly_dollar_waste);
   const dollarsForecast = Math.round(insights.forecast_dollar_waste ?? 0);
@@ -670,7 +707,7 @@ export default function App() {
   const plasticForecast = insights.forecast_plastic_count ?? 0;
   const harmful = insights.harmful_plastic_count ?? 0;
   const banFlags = insights.ban_flag_count ?? 0;
-  const enzymeAlert = insights.enzyme_alert ?? false;
+  const enzymeAlert = locality.enzyme_alert ?? false;
   const localActive = locality.active_restaurants;
 
   const foodKg = insights.weekly_food_kg ?? 0;
@@ -687,6 +724,15 @@ export default function App() {
 
   return (
     <>
+      {demoMode && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999,
+          background: "#b45309", color: "#fff", textAlign: "center",
+          padding: "6px 12px", fontSize: 13, fontWeight: 600, letterSpacing: "0.02em",
+        }}>
+          DEMO MODE — backend unavailable, showing sample data
+        </div>
+      )}
       {/* Sky */}
       <div className="sw-sky">
         <div className="sw-sun" />
@@ -756,7 +802,7 @@ export default function App() {
             <Card active={onScreen2} delay={0}>
               <div className="sw-card-label">Sustainability Score</div>
               <div className="sw-card-value">
-                <Counter target={score} active={onScreen2} />
+                <Counter target={score} decimals={1} suffix="/4" active={onScreen2} />
               </div>
               <div className="sw-card-sub sw-c1">
                 {badge} Tier
@@ -832,7 +878,7 @@ export default function App() {
                 Prophet · Databricks
               </div>
               <div className="sw-card-sub sw-c2">Peak on {peakDay} · kg / day</div>
-              <Sparkline series={WEEKLY_SERIES} active={onScreen2} />
+              <Sparkline series={weeklySeries} active={onScreen2} />
             </Card>
           </div>
 

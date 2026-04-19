@@ -4,7 +4,7 @@ the scans_unified / insights pipeline.
 
 Runs AFTER ``restaurant_rolling.py`` writes base insight rows. Computes the
 five Person-B signals per restaurant (each 20%) and UPDATEs insights with:
-  - sustainability_score (0–100)
+  - sustainability_score (1–4)
   - signal_1..signal_5     (per-signal breakdown for dashboard)
   - badge_tier             (display name, e.g. "Thriving Forest")
   - tier_emoji, tier_key   (for /assets/badges/{tier_key}.png)
@@ -351,7 +351,7 @@ def main():
             percentile = rank_idx / max(n - 1, 1)
 
             full_msg = (
-                f"Score: {round(s['score'])}/100 · {s['tier_emoji']} {s['tier_name']}. "
+                f"Score: {s['score']:.1f}/4 · {s['tier_emoji']} {s['tier_name']}. "
                 f"Better than {better_than} of {n} restaurants in {s['neighborhood']}. "
                 f"Tip: {s['tip']}."
             )

@@ -112,3 +112,8 @@ export const getInsights = (restaurantId: string) =>
 
 export const getLocality = (zip: string) =>
   get<LocalityAgg>(`/locality/${zip}`);
+
+export type DayActual = { day: string; actual: number };
+
+export const getWeeklySeries = (restaurantId: string) =>
+  get<DayActual[]>(`/weekly-series/${restaurantId}`);

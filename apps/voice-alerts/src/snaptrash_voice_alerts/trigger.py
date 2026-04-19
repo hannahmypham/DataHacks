@@ -6,7 +6,6 @@ Uses email_sender.py (SMTP per EMAIL_CONFIRMATION_SYSTEM.md) and logs to DB.
 Per snaptrash skill and plan. Repeated runs supported for demo (no duplicate check).
 """
 import sys
-import time
 from datetime import datetime, timezone
 from typing import List
 
@@ -47,11 +46,8 @@ def run_voice_alert_check(specific_zip: str | None = None) -> None:
         print(f"\nProcessing alert for {report.neighborhood} ({report.total_plastic_kg:.1f}kg plastic)...")
         call_id = vapi_client.initiate_call(report)
         if call_id:
-            # Poll for outcome (non-blocking in prod; here for demo)
-            print("Polling for call completion (simulated 10s delay for demo)...")
-            # In production, run as background or use Vapi webhooks
-            time.sleep(10)  # placeholder; replace with full poll_call in real run
-            poll_result = vapi_client.poll_call(call_id, max_polls=5, poll_interval=2)
+            print("Polling for call completion...")
+            poll_result = vapi_client.poll_call(call_id, max_polls=12, poll_interval=5)
             print(f"Call result: {poll_result.get('status', 'N/A')}. Transcript snippet: {poll_result.get('transcript', '')[:100] if poll_result.get('transcript') else 'N/A'}")
             print("✅ Voice alert processed.")
         else:

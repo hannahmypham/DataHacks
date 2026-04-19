@@ -59,9 +59,9 @@ class _Settings:
     AWS_SECRET_ACCESS_KEY: str = _str("AWS_SECRET_ACCESS_KEY")
     S3_BUCKET: str = _str("S3_BUCKET", "snaptrash-bins")
 
-    # APIs
-    XAI_API_KEY: str = _str("XAI_API_KEY")
-    GROK_VISION_MODEL: str = _str("GROK_VISION_MODEL", "grok-2-vision-1212")
+    # APIs — support both XAI_API_KEY and GROQ_API_KEY (friend's naming)
+    XAI_API_KEY: str = _str("XAI_API_KEY") or _str("GROQ_API_KEY")
+    GROK_VISION_MODEL: str = _str("GROK_VISION_MODEL") or _str("GROQ_VISION_MODEL", "grok-2-vision-1212")
     S3_RAW_BUCKET: str = _str("S3_RAW_BUCKET", "snaptrash-raw-incoming")
     FIRECRAWL_API_KEY: str = _str("FIRECRAWL_API_KEY")
     SENDGRID_API_KEY: str = _str("SENDGRID_API_KEY")

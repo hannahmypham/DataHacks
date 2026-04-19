@@ -78,15 +78,10 @@ def sustainability_score(
     signal4: float,
     signal5: float,
 ) -> float:
-    """Equal-weight blend of the five signals (0–100)."""
-    raw = (
-        (signal1 * 0.20)
-        + (signal2 * 0.20)
-        + (signal3 * 0.20)
-        + (signal4 * 0.20)
-        + (signal5 * 0.20)
-    )
-    return max(0.0, min(100.0, round(raw, 1)))
+    """Equal-weight blend of the five signals, mapped to 1–4 scale."""
+    raw = (signal1 + signal2 + signal3 + signal4 + signal5) * 0.20
+    score_1_4 = 1.0 + (raw / 100.0) * 3.0
+    return max(1.0, min(4.0, round(score_1_4, 1)))
 
 
 TierKey = Literal[
@@ -100,16 +95,16 @@ TierKey = Literal[
 
 
 def tier_for_score(score: float) -> tuple[str, str, TierKey]:
-    """Tier display name, emoji, asset key (for /assets/badges/{tier_key}.png)."""
-    if score >= 90:
+    """Tier display name, emoji, asset key (for /assets/badges/{tier_key}.png). Score is 1–4."""
+    if score >= 3.7:
         return ("Thriving Forest", "🌳", "thriving_forest")
-    if score >= 80:
+    if score >= 3.4:
         return ("Full Tree", "🌲", "full_tree")
-    if score >= 70:
+    if score >= 3.1:
         return ("Growing Plant", "🌿", "growing_plant")
-    if score >= 60:
+    if score >= 2.8:
         return ("Small Sprout", "🌱", "small_sprout")
-    if score >= 50:
+    if score >= 2.5:
         return ("Seed", "🌰", "seed")
     return ("Bare Root", "🪨", "bare_root")
 
