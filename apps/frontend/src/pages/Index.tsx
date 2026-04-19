@@ -82,24 +82,24 @@ const mockLocality: LocalityAgg = {
 
 // Fallback static data — overwritten at runtime by getWeeklySeries() API call
 let weeklySeries = [
-  { day: "Mon", actual: 6.2, forecast: 6.5 },
-  { day: "Tue", actual: 7.8, forecast: 7.2 },
-  { day: "Wed", actual: 5.9, forecast: 6.8 },
-  { day: "Thu", actual: 9.1, forecast: 8.5 },
-  { day: "Fri", actual: 12.4, forecast: 11.8 },
-  { day: "Sat", actual: 10.8, forecast: 11.2 },
-  { day: "Sun", actual: 8.6, forecast: 9.0 },
+  { day: "Monday",    actual: 6.2,  forecast: 6.5  },
+  { day: "Tuesday",   actual: 7.8,  forecast: 7.2  },
+  { day: "Wednesday", actual: 5.9,  forecast: 6.8  },
+  { day: "Thursday",  actual: 9.1,  forecast: 8.5  },
+  { day: "Friday",    actual: 12.4, forecast: 11.8 },
+  { day: "Saturday",  actual: 10.8, forecast: 11.2 },
+  { day: "Sunday",    actual: 8.6,  forecast: 9.0  },
 ];
 
 // Derived from weeklySeries × (forecast_food_kg / actual_total) ratio
 let dailyForecast = [
-  { day: "Mon", value: 9.2 },
-  { day: "Tue", value: 10.5 },
-  { day: "Wed", value: 11.8 },
-  { day: "Thu", value: 13.2 },
-  { day: "Fri", value: 14.5 },
-  { day: "Sat", value: 12.9 },
-  { day: "Sun", value: 11.3 },
+  { day: "Monday",    value: 9.2  },
+  { day: "Tuesday",   value: 10.5 },
+  { day: "Wednesday", value: 11.8 },
+  { day: "Thursday",  value: 13.2 },
+  { day: "Friday",    value: 14.5 },
+  { day: "Saturday",  value: 12.9 },
+  { day: "Sunday",    value: 11.3 },
 ];
 
 const SCORE_BANDS = [
@@ -403,11 +403,7 @@ function WasteSection() {
   const foodThreshold = 80;
   // Compute inline — useMemo(fn,[]) would freeze on mount and miss API updates
   const peakDay = weeklySeries.reduce((a, b) => (b.actual > a.actual ? b : a));
-  const DAY_FULL: Record<string, string> = {
-    Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday",
-    Fri: "Friday", Sat: "Saturday", Sun: "Sunday",
-  };
-  const peakLabel = DAY_FULL[peakDay.day] ?? peakDay.day;
+  const peakLabel = peakDay.day;
 
   const foodLbs = mockScan.weekly_food_kg * KG_TO_LBS;
   const foodTrending = mockScan.weekly_food_kg > mockScan.forecast_food_kg;
@@ -732,9 +728,7 @@ function GlobalSection() {
                     <div key={d.day} className="flex items-center justify-between rounded-lg border border-signal-good/30 bg-signal-good/10 px-3 py-2">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{i === 0 ? "🥇" : "🥈"}</span>
-                        <span className="font-bold">{
-                          { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" }[d.day] ?? d.day
-                        }</span>
+                        <span className="font-bold">{d.day}</span>
                       </div>
                       <span className="font-bold tabular-nums text-signal-good">{d.value} lbs</span>
                     </div>
@@ -748,9 +742,7 @@ function GlobalSection() {
                     <div key={d.day} className="flex items-center justify-between rounded-lg border border-signal-bad/30 bg-signal-bad/10 px-3 py-2">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{i === 0 ? "🚨" : "⚠️"}</span>
-                        <span className="font-bold">{
-                          { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" }[d.day] ?? d.day
-                        }</span>
+                        <span className="font-bold">{d.day}</span>
                       </div>
                       <span className="font-bold tabular-nums text-signal-bad">{d.value} lbs</span>
                     </div>
@@ -773,13 +765,9 @@ function GlobalSection() {
         <div className="space-y-3">
           {(() => {
             const maxVal = Math.max(...dailyForecast.map(d => d.value), 1);
-            const DAY_FULL: Record<string, string> = {
-              Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday",
-              Fri: "Friday", Sat: "Saturday", Sun: "Sunday",
-            };
             return dailyForecast.map((d) => (
             <div key={d.day} className="flex items-center gap-4">
-              <div className="w-20 text-sm opacity-70">{DAY_FULL[d.day] ?? d.day}</div>
+              <div className="w-24 text-sm opacity-70">{d.day}</div>
               <div className="h-8 flex-1 overflow-hidden rounded-lg border border-foreground/20 bg-foreground/10">
                 <div
                   className="h-full bg-gradient-to-r from-signal-warn to-signal-amber transition-all duration-1000 ease-out"
