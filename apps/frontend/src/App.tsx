@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Insight, LocalityAgg } from "./lib/api";
-import { getInsights, getLocality } from "./lib/api";
+import { getInsights, getLocality, getWeeklySeries } from "./lib/api";
 import { cn } from "./lib/cn";
 
 const RESTAURANT_ID = "test-restaurant-001";
@@ -627,6 +627,7 @@ const FoodDecoSVG = ({ active }: { active: boolean }) => (
 export default function App() {
   const [insights, setInsights] = useState<Insight>(MOCK_INSIGHTS);
   const [locality, setLocality] = useState<LocalityAgg>(MOCK_LOCALITY);
+  const [weeklySeries, setWeeklySeries] = useState(WEEKLY_SERIES);
 
   // Fetch real data; silently fall back to mock on error
   useEffect(() => {
@@ -637,6 +638,29 @@ export default function App() {
     getLocality(ZIP)
       .then((data) => setLocality(data))
       .catch((err) => console.warn("[SnapWaste] locality unavailable, using mock:", err));
+
+    // Build weekly sparkline: actuals from scans, forecast derived from Prophet ratio
+    getWeeklySeries(RESTAURANT_ID)
+      .then((days) => {
+        if (!days.length) return;
+        // Will be refined once insights loaded — use ratio: forecast / actual total
+        setWeeklySeries(
+          days.map((d) => ({ day: d.day, actual: d.actual, forecast: d.actual }))
+        );
+        // Once insights also loads, recompute forecast column via ratio
+        getInsights(RESTAURANT_ID).then((ins) => {
+          const actualTotal = days.reduce((s, d) => s + d.actual, 0);
+          const ratio = actualTotal > 0 ? (ins.forecast_food_kg ?? actualTotal) / actualTotal : 1;
+          setWeeklySeries(
+            days.map((d) => ({
+              day: d.day,
+              actual: d.actual,
+              forecast: parseFloat((d.actual * ratio).toFixed(2)),
+            }))
+          );
+        }).catch(() => {/* keep series without forecast scaling */});
+      })
+      .catch((err) => console.warn("[SnapWaste] weekly-series unavailable, using mock:", err));
   }, []);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -682,7 +706,7 @@ export default function App() {
   const plasticForecast = insights.forecast_plastic_count ?? 0;
   const harmful = insights.harmful_plastic_count ?? 0;
   const banFlags = insights.ban_flag_count ?? 0;
-  const enzymeAlert = insights.enzyme_alert ?? false;
+  const enzymeAlert = locality.enzyme_alert ?? false;
   const localActive = locality.active_restaurants;
 
   const foodKg = insights.weekly_food_kg ?? 0;
@@ -844,7 +868,7 @@ export default function App() {
                 Prophet · Databricks
               </div>
               <div className="sw-card-sub sw-c2">Peak on {peakDay} · kg / day</div>
-              <Sparkline series={WEEKLY_SERIES} active={onScreen2} />
+              <Sparkline series={weeklySeries} active={onScreen2} />
             </Card>
           </div>
 
