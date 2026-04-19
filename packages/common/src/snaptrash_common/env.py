@@ -28,6 +28,10 @@ def _load_dotenv() -> None:
 
 _load_dotenv()
 
+# Repo root — resolved at import time; used by ingestion services to locate data files.
+# Path: packages/common/src/snaptrash_common/ → 5 parents up → repo root
+REPO_ROOT: pathlib.Path = pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent
+
 
 def _str(key: str, default: str = "") -> str:
     return os.environ.get(key, default)

@@ -25,7 +25,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from snaptrash_common.databricks_client import execute, fetch_all
-from snaptrash_common.tables import SCANS, SYNTH_SCANS
+from snaptrash_common.tables import SCANS, SYNTH_SCANS, ddl_scans_unified
 
 RNG_SEED = 42
 DAYS_BACK = 14
@@ -256,6 +256,9 @@ def _ensure_table() -> None:
             harmful_plastic_count   INT,
             pet_kg                  DOUBLE,
             ps_count                INT,
+            total_plastic_kg        DOUBLE,
+            ban_flag_count          INT,
+            recyclable_count        INT,
             food_items_json         STRING,
             plastic_items_json      STRING
         ) USING DELTA
@@ -284,6 +287,7 @@ def _insert_rows(rows: list[dict]) -> None:
             f"{r['dollar_wastage']},{r['co2_kg']},"
             f"{r['plastic_count']},{r['harmful_plastic_count']},"
             f"{r['pet_kg']},{r['ps_count']},"
+            f"{r.get('total_plastic_kg', 0.0)},{r.get('ban_flag_count', 0)},{r.get('recyclable_count', 0)},"
             f"'{_q(r['food_items_json'])}',"
             f"'{_q(r['plastic_items_json'])}'"
             ")"
@@ -316,6 +320,11 @@ def main() -> int:
         print(f"   (real snaptrash.scans row count: {int(real[0]['n'])})")
     except Exception:
         pass
+
+    # Rebuild scans_unified UNION ALL view now that SYNTH_SCANS is populated.
+    execute(ddl_scans_unified())
+    print("✅ scans_unified view rebuilt")
+
     return len(rows)
 
 

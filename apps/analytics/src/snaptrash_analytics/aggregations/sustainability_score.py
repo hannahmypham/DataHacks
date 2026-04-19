@@ -23,11 +23,11 @@ Signals (all 20% equal weight):
 from __future__ import annotations
 
 import json
-import math
 from collections import defaultdict
 from datetime import datetime, timezone
 
 from snaptrash_common.databricks_client import execute, fetch_all
+from snaptrash_common.geo import haversine
 from snaptrash_common.tables import (
     SCANS_UNIFIED, INSIGHTS, GOLD_COMPOSTING, GOLD_CA_CAPACITY,
     GOLD_SD_COMMERCIAL, GOLD_SD_RESTAURANTS,
@@ -50,14 +50,6 @@ RESTAURANT_SHARE_OF_COMMERCIAL_FOOD = 0.30
 # Haversine (facility distance — UI display only, not in score)
 # ---------------------------------------------------------------------------
 
-def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = (math.sin(dlat / 2) ** 2
-         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
-         * math.sin(dlon / 2) ** 2)
-    return R * 2 * math.asin(math.sqrt(a))
 
 
 # ---------------------------------------------------------------------------

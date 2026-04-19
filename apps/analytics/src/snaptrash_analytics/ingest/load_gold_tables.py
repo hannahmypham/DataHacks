@@ -8,9 +8,8 @@ Gold tables produced:
   snaptrash.gold_composting_routes_ca — CA facilities sorted by distance from SD
 """
 from __future__ import annotations
-import math
-
 from snaptrash_common.databricks_client import execute, fetch_all
+from snaptrash_common.geo import haversine
 from snaptrash_common.tables import (
     GOLD_WCS, GOLD_SD_DISPOSAL, GOLD_COMPOSTING,
     GOLD_CA_CAPACITY, GOLD_SD_POPULATION, GOLD_SD_COMMERCIAL,
@@ -27,15 +26,6 @@ SD_LNG = -117.1611
 # Haversine distance (km)
 # ---------------------------------------------------------------------------
 
-def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = (math.sin(dlat / 2) ** 2
-         + math.cos(math.radians(lat1))
-         * math.cos(math.radians(lat2))
-         * math.sin(dlon / 2) ** 2)
-    return R * 2 * math.asin(math.sqrt(a))
 
 
 # ---------------------------------------------------------------------------

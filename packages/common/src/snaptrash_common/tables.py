@@ -50,6 +50,9 @@ def ddl_scans() -> str:
         harmful_plastic_count INT,
         pet_kg DOUBLE,
         ps_count INT,
+        total_plastic_kg DOUBLE,
+        ban_flag_count INT,
+        recyclable_count INT,
         food_items_json STRING,
         plastic_items_json STRING
     ) USING DELTA
@@ -224,6 +227,7 @@ def ddl_scans_unified() -> str:
         food_kg, compostable_kg, contaminated_kg,
         dollar_wastage, co2_kg,
         plastic_count, harmful_plastic_count, pet_kg, ps_count,
+        total_plastic_kg, ban_flag_count, recyclable_count,
         food_items_json, plastic_items_json,
         FALSE AS is_synthetic
     FROM {SCANS}
@@ -233,6 +237,7 @@ def ddl_scans_unified() -> str:
         food_kg, compostable_kg, contaminated_kg,
         dollar_wastage, co2_kg,
         plastic_count, harmful_plastic_count, pet_kg, ps_count,
+        total_plastic_kg, ban_flag_count, recyclable_count,
         food_items_json, plastic_items_json,
         TRUE  AS is_synthetic
     FROM {SYNTH_SCANS}
@@ -248,4 +253,7 @@ ALL_DDL = [
     ddl_gold_wcs_benchmark,
     ddl_gold_sd_disposal_ts,
     ddl_gold_composting_routes_ca,
+    # ddl_scans_unified runs last — depends on SCANS + SYNTH_SCANS existing.
+    # bootstrap_databricks.py skips this if SYNTH_SCANS not yet seeded.
+    ddl_scans_unified,
 ]

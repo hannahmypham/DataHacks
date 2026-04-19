@@ -11,9 +11,15 @@ def main():
     print(f"✅ schema {settings.fq_schema}")
     for ddl_fn in ALL_DDL:
         sql = ddl_fn()
-        execute(sql)
-        first_line = " ".join(sql.split())[:80]
-        print(f"✅ {first_line}...")
+        try:
+            execute(sql)
+            first_line = " ".join(sql.split())[:80]
+            print(f"✅ {first_line}...")
+        except Exception as e:
+            # ddl_scans_unified (CREATE OR REPLACE VIEW) fails if SYNTH_SCANS not yet seeded.
+            # Run scripts/seed_synthetic_scans.py first, then re-run bootstrap to create view.
+            first_line = " ".join(sql.split())[:60]
+            print(f"⚠️  skipped (run seed first): {first_line}... [{e}]")
     print("done.")
 
 
