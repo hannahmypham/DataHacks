@@ -41,7 +41,7 @@ const KM_TO_MI = 0.621371;
 const mockScan: ScanResponse = {
   weekly_food_kg: 8.6,   // stored as kg internally; display in lbs
   forecast_food_kg: 10.2,
-  weekly_plastic_count: 18,
+  weekly_plastic_count: 40,
   weekly_dollar_waste: 42.0,
   forecast_next_week: 48.0,
   top_waste_category: "Produce",
@@ -62,7 +62,7 @@ const mockScan: ScanResponse = {
 
 // TODO: replace with live API call -> getInsights()
 const mockInsight: Insight = {
-  sustainability_score: 67,
+  sustainability_score: 23.5,
   badge_tier: "Growing Tree",
   recommendation: "Reduce food waste volume",
   co2_avoided: 48.6,
@@ -816,7 +816,15 @@ function GlobalSection() {
             <h3 className="mb-2 text-2xl font-bold uppercase tracking-wide">
               Nearest Composting Facility
             </h3>
-            <p className="text-xl opacity-90">{mockInsight.nearest_facility_name}</p>
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mockInsight.nearest_facility_name ?? "composting facility")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xl text-signal-good underline-offset-4 hover:underline"
+            >
+              {mockInsight.nearest_facility_name} ↗
+            </a>
+            <p className="mt-1 text-xs opacity-50">Tap for directions</p>
           </div>
         </div>
         <div className="grid gap-6 border-t border-foreground/20 pt-6 sm:grid-cols-2">
