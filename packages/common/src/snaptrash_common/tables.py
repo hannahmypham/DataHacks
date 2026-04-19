@@ -34,6 +34,9 @@ def ddl_scans() -> str:
         harmful_plastic_count INT,
         pet_kg DOUBLE,
         ps_count INT,
+        total_plastic_kg DOUBLE,
+        ban_flag_count INT,
+        recyclable_count INT,
         food_items_json STRING,
         plastic_items_json STRING
     ) USING DELTA
@@ -62,7 +65,10 @@ def ddl_insights() -> str:
         locality_percentile DOUBLE,
         top_waste_category STRING,
         recommendation STRING,
-        co2_avoided DOUBLE
+        co2_avoided DOUBLE,
+        sustainability_score DOUBLE,
+        badge_tier STRING,
+        score_feedback_message STRING
     ) USING DELTA
     """
 

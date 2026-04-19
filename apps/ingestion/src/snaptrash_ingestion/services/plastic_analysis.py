@@ -71,3 +71,52 @@ def enrich(item: PlasticItem, *, state: str = "CA") -> PlasticItem:
     else:
         item.status = "non_recyclable"
     return item
+
+
+def compute_sustainability_metrics(
+    plastic_items: list[PlasticItem], state: str = "CA"
+) -> dict:
+    """Compute ban_flag_count, recyclable_count, total_plastic_kg etc. for sustainability score.
+    Must be called *after* enrich() so that polymer_type, recyclable, harmful are populated.
+    Matches exact signals from SnapTrash sustainability spec.
+    """
+    if not plastic_items:
+        return {
+            "total_plastic_kg": 0.0,
+            "ban_flag_count": 0,
+            "recyclable_count": 0,
+            "total_plastic_count": 0,
+            "harmful_count": 0,
+        }
+
+    total_plastic_kg = sum(p.estimated_kg for p in plastic_items)
+    total_plastic_count = sum(p.estimated_count for p in plastic_items)
+    
+    ban_flag_count = 0
+    recyclable_count = 0
+    harmful_count = 0
+    
+    for p in plastic_items:
+        if not getattr(p, "polymer_type", None):
+            continue
+        poly = p.polymer_type
+        item_type_lower = p.type.lower()
+        
+        # Banned plastics (CA law per spec): PS or LDPE single-use bags
+        is_bag = any(b in item_type_lower for b in ["bag", "shopping bag", "ldpe bag"])
+        if poly == "PS" or (poly == "LDPE" and is_bag):
+            ban_flag_count += p.estimated_count
+        
+        if getattr(p, "recyclable", False):
+            recyclable_count += p.estimated_count
+        
+        if getattr(p, "harmful", False):
+            harmful_count += p.estimated_count
+    
+    return {
+        "total_plastic_kg": round(total_plastic_kg, 3),
+        "ban_flag_count": ban_flag_count,
+        "recyclable_count": recyclable_count,
+        "total_plastic_count": total_plastic_count,
+        "harmful_count": harmful_count,
+    }

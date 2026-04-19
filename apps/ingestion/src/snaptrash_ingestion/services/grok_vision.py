@@ -28,11 +28,13 @@ Identify each distinct food item or organic material visible in the bin:
 
 STEP 2 — PLASTIC & PACKAGING ANALYSIS
 Identify each type of plastic or packaging material visible:
-- Classify the item type (e.g. foam container, plastic bottle, cling film, styrofoam cup, black tray)
-- Look for resin codes (1–7) printed or embossed on packaging; record null if not visible
+- Classify the item type carefully (e.g. "foam container", "plastic bottle", "cling film", "styrofoam cup", "LDPE single-use shopping bag", "black tray")
+- Look for resin codes (1–7); record null if not visible. Pay special attention to LDPE bags (often resin 4, thin crinkly shopping bags)
 - Note the color of the plastic
-- Flag explicitly if the item is black plastic (a recycling problem due to infrared sorting failure)
+- Flag explicitly if the item is black plastic (recycling problem)
+- Estimate realistic weight in kg for each plastic item type (similar to food; commercial bin scale)
 - Estimate the count of each item type
+- For banned/harmful classification: note PS (styrofoam/foam = banned in CA), LDPE single-use bags (banned), PVC (harmful)
 
 STEP 3 — BIN-LEVEL ASSESSMENT
 After item-level analysis, assess the bin as a whole:
@@ -54,11 +56,12 @@ Return ONLY valid JSON matching this schema, with no explanation or markdown:
     "compostable": true
   }],
   "plastic_items": [{
-    "type": "string",                    // e.g. "foam container", "plastic bottle", "cling film"
+    "type": "string",                    // e.g. "foam container", "plastic bottle", "cling film", "LDPE single-use shopping bag"
     "resin_code": null,                  // 1–7 if visible, otherwise null
     "color": "string",
     "is_black_plastic": false,
-    "estimated_count": 1
+    "estimated_count": 1,
+    "estimated_kg": 0.0                  // realistic commercial bin weight estimate
   }],
   "organics_percent": 65,               // 0–100, visual estimate of food/organic content
   "plastic_percent": 35,                // 0–100, visual estimate of plastic/packaging content

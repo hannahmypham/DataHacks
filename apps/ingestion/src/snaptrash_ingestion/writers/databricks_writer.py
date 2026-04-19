@@ -12,6 +12,7 @@ INSERT INTO {SCANS} VALUES (
     :dollar_wastage, :co2_kg,
     :plastic_count, :harmful_plastic_count,
     :pet_kg, :ps_count,
+    :total_plastic_kg, :ban_flag_count, :recyclable_count,
     :food_items_json, :plastic_items_json
 )
 """

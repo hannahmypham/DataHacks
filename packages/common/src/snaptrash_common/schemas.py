@@ -25,6 +25,7 @@ class PlasticItem(BaseModel):
     color: str | None = None
     is_black_plastic: bool = False
     estimated_count: int = 1
+    estimated_kg: float = 0.0  # new for sustainability total_plastic_kg
 
     # enriched (Stage 4)
     polymer_type: str | None = None
@@ -61,6 +62,9 @@ class ScanRow(BaseModel):
     harmful_plastic_count: int
     pet_kg: float
     ps_count: int
+    total_plastic_kg: float = 0.0
+    ban_flag_count: int = 0
+    recyclable_count: int = 0
     food_items_json: str
     plastic_items_json: str
 
@@ -74,6 +78,10 @@ class InsightRow(BaseModel):
     top_waste_category: str
     recommendation: str
     co2_avoided: float
+    # Sustainability score (new per spec)
+    sustainability_score: float = 0.0
+    badge_tier: str | None = None
+    score_feedback_message: str | None = None
 
 
 class LocalityAggRow(BaseModel):

@@ -43,6 +43,9 @@ async def create_scan(
         # Stage 4 — plastic enrichment
         enriched_plastic = [plastic_analysis.enrich(p) for p in vision.plastic_items]
 
+        # New: sustainability metrics (after enrichment so flags are set)
+        sustain_metrics = plastic_analysis.compute_sustainability_metrics(enriched_plastic)
+
         # roll up → ScanRow
         food_kg = sum(f.estimated_kg for f in enriched_food)
         compostable_kg = sum(f.estimated_kg for f in enriched_food if f.compostable and not f.contaminated)
@@ -69,6 +72,9 @@ async def create_scan(
             harmful_plastic_count=harmful_plastic_count,
             pet_kg=pet_kg,
             ps_count=ps_count,
+            total_plastic_kg=sustain_metrics["total_plastic_kg"],
+            ban_flag_count=sustain_metrics["ban_flag_count"],
+            recyclable_count=sustain_metrics["recyclable_count"],
             food_items_json=json.dumps([f.model_dump() for f in enriched_food]),
             plastic_items_json=json.dumps([p.model_dump() for p in enriched_plastic]),
         )
