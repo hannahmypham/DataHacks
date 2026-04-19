@@ -20,8 +20,8 @@ const MOCK_INSIGHTS: Insight = {
   locality_percentile: 0.78,
   better_than_count: 37,
   zip_restaurant_count: 47,
-  sustainability_score: 84,
-  badge_tier: "Gold",
+  sustainability_score: 3.5,
+  badge_tier: "Growing Plant",
   score_feedback_message:
     "Better than 78% of restaurants in your ZIP. Keep reducing single-use plastics!",
   top_waste_category: "Plastic",
@@ -690,7 +690,7 @@ export default function App() {
   };
 
   // Data derivations from Insight schema
-  const score = insights.sustainability_score ?? 84;
+  const score = insights.sustainability_score ?? 3.5;
   const badge = insights.badge_tier ?? "Gold";
   const dollars = Math.round(insights.weekly_dollar_waste);
   const dollarsForecast = Math.round(insights.forecast_dollar_waste ?? 0);
@@ -792,7 +792,7 @@ export default function App() {
             <Card active={onScreen2} delay={0}>
               <div className="sw-card-label">Sustainability Score</div>
               <div className="sw-card-value">
-                <Counter target={score} active={onScreen2} />
+                <Counter target={score} decimals={1} suffix="/4" active={onScreen2} />
               </div>
               <div className="sw-card-sub sw-c1">
                 {badge} Tier
