@@ -15,15 +15,24 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pandas as pd
-import mlflow
 from prophet import Prophet
 
 from snaptrash_common.databricks_client import execute, fetch_all
 from snaptrash_common.tables import SCANS_UNIFIED, INSIGHTS, GOLD_SD_DISPOSAL
 
+# MLflow is optional — pre-installed on some Databricks runtimes, absent on others.
+try:
+    import mlflow
+    _MLFLOW = True
+except ImportError:
+    mlflow = None
+    _MLFLOW = False
+
+
 def _setup_mlflow():
-    """Create or get MLflow experiment — tolerates missing parent dirs or permission errors."""
-    # Use /Shared/ so any workspace token can read/write regardless of user.
+    if not _MLFLOW:
+        print("  MLflow not available — skipping experiment tracking")
+        return
     for exp_name in ("/Shared/snaptrash/prophet_v2", "/Users/ara023@ucsd.edu/snaptrash/prophet_v2"):
         try:
             mlflow.set_experiment(exp_name)
@@ -43,6 +52,13 @@ def _setup_mlflow():
         pass
 
 _setup_mlflow()
+
+
+class _nullctx:
+    """No-op context manager used when MLflow is unavailable."""
+    def __enter__(self): return self
+    def __exit__(self, *_): pass
+
 
 MIN_DAYS_FOR_PROPHET = 7  # use mean fallback below this
 
@@ -173,21 +189,23 @@ def main():
     for rid in restaurants:
         sub = df[df["restaurant_id"] == rid].copy().sort_values("ds")
 
-        with mlflow.start_run(run_name=f"forecast_{rid}"):
+        _run_ctx = mlflow.start_run(run_name=f"forecast_{rid}") if _MLFLOW else _nullctx()
+        with _run_ctx:
             food_7d = _fit_forecast(sub, "food_kg", sd_trend)
             dollar_7d = _fit_forecast(sub, "dollar_wastage", sd_trend)
             plastic_7d = _fit_forecast(sub, "plastic_count", sd_trend, use_regressor=False)
 
-            mlflow.log_params({
-                "restaurant_id": rid,
-                "training_days": len(sub),
-                "sd_trend_years": len(sd_trend),
-            })
-            mlflow.log_metrics({
-                "forecast_food_kg_7d": food_7d,
-                "forecast_dollar_waste_7d": dollar_7d,
-                "forecast_plastic_7d": plastic_7d,
-            })
+            if _MLFLOW:
+                mlflow.log_params({
+                    "restaurant_id": rid,
+                    "training_days": len(sub),
+                    "sd_trend_years": len(sd_trend),
+                })
+                mlflow.log_metrics({
+                    "forecast_food_kg_7d": food_7d,
+                    "forecast_dollar_waste_7d": dollar_7d,
+                    "forecast_plastic_7d": plastic_7d,
+                })
 
             # Forecast insight message
             last_food = float(sub["food_kg"].tail(7).sum())
