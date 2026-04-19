@@ -106,10 +106,10 @@ def _load_sd_zip_centroids() -> dict[str, tuple[float, float]]:
     if _SD_ZIP_CENTROIDS:
         return _SD_ZIP_CENTROIDS
     try:
-        import requests  # noqa: PLC0415
+        import httpx  # noqa: PLC0415
         url = ("https://opendata.arcgis.com/datasets/"
                "41c3a7bd375547069a78fce90153f39c_0.geojson")
-        resp = requests.get(url, timeout=15)
+        resp = httpx.get(url, timeout=15)
         geojson = resp.json()
         for feat in geojson.get("features", []):
             zip5 = feat["properties"].get("ZCTA5CE20") or feat["properties"].get("zip")
