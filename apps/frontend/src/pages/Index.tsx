@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Calendar,
   AlertTriangle,
@@ -401,14 +401,13 @@ function ScoreSection({ lastScan }: { lastScan: LatestScan | null }) {
 
 function WasteSection() {
   const foodThreshold = 80;
-  const peakDay = useMemo(
-    () => weeklySeries.reduce((a, b) => (b.actual > a.actual ? b : a)),
-    [],
-  );
-  const peakLabel =
-    { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" }[
-      peakDay.day
-    ] ?? peakDay.day;
+  // Compute inline — useMemo(fn,[]) would freeze on mount and miss API updates
+  const peakDay = weeklySeries.reduce((a, b) => (b.actual > a.actual ? b : a));
+  const DAY_FULL: Record<string, string> = {
+    Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday",
+    Fri: "Friday", Sat: "Saturday", Sun: "Sunday",
+  };
+  const peakLabel = DAY_FULL[peakDay.day] ?? peakDay.day;
 
   const foodLbs = mockScan.weekly_food_kg * KG_TO_LBS;
   const foodTrending = mockScan.weekly_food_kg > mockScan.forecast_food_kg;
@@ -571,15 +570,23 @@ function WasteSection() {
 
 function PlasticSection() {
   const plasticThreshold = 50;
-  const harmfulItems = mockScan.plastic_items.filter((p) => p.harmful);
-  const bannedItems = mockScan.plastic_items.filter((p) => p.banned);
-  const currentItems = mockScan.weekly_plastic_count;
+  // Use live insight counts (updated every 30s from API)
+  const currentItems = mockInsight.weekly_plastic_count ?? mockScan.weekly_plastic_count;
+  const forecastItems = mockInsight.forecast_plastic_count ?? currentItems;
+  const harmfulCount = mockInsight.harmful_plastic_count ?? 0;
+  const bannedCount = mockInsight.ban_flag_count ?? 0;
+  // Estimate volume: ~20g per plastic item (matches ps_count * 0.02 kg in score pipeline)
+  const volumeLbs = parseFloat((currentItems * 0.02 * KG_TO_LBS).toFixed(1));
+  const forecastVolumeLbs = parseFloat((forecastItems * 0.02 * KG_TO_LBS).toFixed(1));
+  const volumeTrending = forecastItems > currentItems;
+  const itemsTrending = forecastItems > currentItems;
   const itemsPerDay = (currentItems / 7).toFixed(1);
-  const volumeTrending = true; // mock: plastic volume trending up
-  const itemsTrending = true;  // mock: item count trending up
   const isAbove = currentItems > plasticThreshold;
   const pct = Math.min(100, (currentItems / plasticThreshold) * 100);
   const thresholdEmoji = isAbove ? "🚨" : pct > 75 ? "⚠️" : pct > 50 ? "😐" : "✅";
+  // Item lists from static mock (detail not available in insights endpoint)
+  const harmfulItems = mockScan.plastic_items.filter((p) => p.harmful);
+  const bannedItems = mockScan.plastic_items.filter((p) => p.banned);
 
   return (
     <SectionShell bg={BG.plastic} overlayClass="bg-gradient-to-b from-black/80 via-black/75 to-black/80">
@@ -590,12 +597,14 @@ function PlasticSection() {
         <div className="card-brand">
           <div className="stat-label">Volume of Plastic</div>
           <div className="mb-2 flex items-baseline gap-3">
-            <div className="stat-num-xl">3.2</div>
+            <div className="stat-num-xl">{volumeLbs}</div>
             <div className="text-2xl opacity-70">lbs/week</div>
             <span className={`text-2xl font-bold ${volumeTrending ? "text-signal-bad" : "text-signal-good"}`}>{volumeTrending ? "↑" : "↓"}</span>
           </div>
           <div className={`text-sm font-semibold ${volumeTrending ? "text-signal-bad" : "text-signal-good"}`}>
-            {volumeTrending ? "Volume increasing this week" : "Volume decreasing this week"}
+            {volumeTrending
+              ? `Forecast ${forecastVolumeLbs} lbs next week`
+              : `Forecast ${forecastVolumeLbs} lbs next week`}
           </div>
         </div>
 
@@ -633,7 +642,7 @@ function PlasticSection() {
               <div>
                 <div className="stat-label mb-2">Harmful Plastics</div>
                 <div className="mb-2 text-4xl font-extrabold tabular-nums text-signal-gold">
-                  {harmfulItems.length}
+                  {harmfulCount || harmfulItems.length}
                 </div>
                 <ul className="space-y-1">
                   {harmfulItems.map((p, i) => (
@@ -647,7 +656,7 @@ function PlasticSection() {
               <div>
                 <div className="stat-label mb-2">Banned Items (SB 54)</div>
                 <div className="mb-2 text-4xl font-extrabold tabular-nums text-signal-bad">
-                  {bannedItems.length}
+                  {bannedCount || bannedItems.length}
                 </div>
                 <ul className="space-y-1">
                   {bannedItems.map((p, i) => (
@@ -762,18 +771,25 @@ function GlobalSection() {
           Locality Level Daily Forecast Breakdown
         </h3>
         <div className="space-y-3">
-          {dailyForecast.map((d) => (
+          {(() => {
+            const maxVal = Math.max(...dailyForecast.map(d => d.value), 1);
+            const DAY_FULL: Record<string, string> = {
+              Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday",
+              Fri: "Friday", Sat: "Saturday", Sun: "Sunday",
+            };
+            return dailyForecast.map((d) => (
             <div key={d.day} className="flex items-center gap-4">
-              <div className="w-16 text-sm opacity-70">{d.day}</div>
+              <div className="w-20 text-sm opacity-70">{DAY_FULL[d.day] ?? d.day}</div>
               <div className="h-8 flex-1 overflow-hidden rounded-lg border border-foreground/20 bg-foreground/10">
                 <div
                   className="h-full bg-gradient-to-r from-signal-warn to-signal-amber transition-all duration-1000 ease-out"
-                  style={{ width: `${(d.value / 15) * 100}%` }}
+                  style={{ width: `${(d.value / maxVal) * 100}%` }}
                 />
               </div>
-              <div className="w-16 text-right font-bold tabular-nums">{d.value} lbs</div>
+              <div className="w-20 text-right font-bold tabular-nums">{d.value} lbs</div>
             </div>
-          ))}
+            ));
+          })()}
         </div>
       </div>
 
@@ -850,22 +866,21 @@ const Index = () => {
         if (locality) {
           Object.assign(mockLocality, locality);
         }
-        // Wire weekly series from API — compute forecast column from Prophet ratio
+        // Wire weekly series from API — convert kg→lbs, compute forecast via Prophet ratio
         if (series && series.length > 0) {
           const actualTotal = series.reduce((s, d) => s + d.actual, 0);
-          const forecastTotal = insight
-            ? Number(insight.forecast_food_kg ?? actualTotal)
-            : actualTotal;
-          const ratio = actualTotal > 0 ? forecastTotal / actualTotal : 1.0;
+          const forecastKg = insight ? Number(insight.forecast_food_kg ?? 0) : 0;
+          // If Prophet forecast is available and > 0, use ratio; else flat (ratio=1)
+          const ratio = actualTotal > 0 && forecastKg > 0 ? forecastKg / actualTotal : 1.0;
           weeklySeries = series.map((d) => ({
             day: d.day,
-            actual: d.actual,
-            forecast: parseFloat((d.actual * ratio).toFixed(2)),
+            actual: parseFloat((d.actual * KG_TO_LBS).toFixed(2)),
+            forecast: parseFloat((d.actual * ratio * KG_TO_LBS).toFixed(2)),
           }));
-          // Daily forecast for next week: same day-of-week pattern scaled by ratio
+          // Daily forecast breakdown: same pattern × ratio, in lbs
           dailyForecast = series.map((d) => ({
             day: d.day,
-            value: parseFloat((d.actual * ratio).toFixed(2)),
+            value: parseFloat((d.actual * ratio * KG_TO_LBS).toFixed(2)),
           }));
         }
         setTick(t => t + 1);

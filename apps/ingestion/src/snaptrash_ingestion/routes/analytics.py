@@ -98,8 +98,8 @@ def get_weekly_series(restaurant_id: str):
         logger.error("weekly-series query failed for %s: %s", restaurant_id, exc)
         raise HTTPException(503, f"Databricks unavailable: {exc}") from exc
 
-    # dayofweek: 1=Sun, 2=Mon, 3=Tue, 4=Wed, 5=Thu, 6=Fri, 7=Sat
-    dow_order = {1: "Su", 2: "M", 3: "Tu", 4: "W", 5: "Th", 6: "F", 7: "Sa"}
+    # dayofweek: 1=Sun, 2=Mon … 7=Sat — use 3-letter names matching frontend lookup map
+    dow_order = {1: "Sun", 2: "Mon", 3: "Tue", 4: "Wed", 5: "Thu", 6: "Fri", 7: "Sat"}
     out = []
     for r in rows:
         try:
