@@ -62,7 +62,7 @@ async def create_scan(
         co2_kg = sum(f.co2_kg or 0.0 for f in enriched_food)
         plastic_count = sum(p.estimated_count for p in enriched_plastic)
         harmful_plastic_count = sum(p.estimated_count for p in enriched_plastic if getattr(p, 'harmful', False))
-        pet_kg = sum(0.05 * p.estimated_count for p in enriched_plastic if getattr(p, 'polymer_type', None) == "PET")
+        pet_kg = sum(p.estimated_kg for p in enriched_plastic if getattr(p, 'polymer_type', None) == "PET")
         ps_count = sum(p.estimated_count for p in enriched_plastic if getattr(p, 'polymer_type', None) == "PS")
 
         row = ScanRow(

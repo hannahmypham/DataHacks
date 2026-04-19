@@ -14,8 +14,10 @@ from snaptrash_common.env import settings
 # Import existing services (package must be included in Lambda deployment package/layer)
 from snaptrash_ingestion.services.grok_vision import analyze_image
 from snaptrash_ingestion.services.s3_client import get_object_bytes, copy_object
+from snaptrash_ingestion.services import food_analysis, plastic_analysis
 from snaptrash_ingestion.writers.databricks_writer import insert_scan
 from snaptrash_common.schemas import GrokVisionResult, ScanRow
+import uuid
 
 s3 = boto3.client('s3')
 rekognition = boto3.client('rekognition')
@@ -27,6 +29,7 @@ def lambda_handler(event, context):
     """Main Lambda entrypoint for S3 event."""
     print("Received S3 event:", json.dumps(event))
 
+    results = []
     for record in event.get('Records', []):
         bucket = record['s3']['bucket']['name']
         key = unquote_plus(record['s3']['object']['key'])
@@ -46,44 +49,64 @@ def lambda_handler(event, context):
             print(f"Image similar to last analyzed for {restaurant_id} (score: {similarity}). Deleting.")
             s3.delete_object(Bucket=bucket, Key=key)
             update_last_analyzed(restaurant_id, key, new_labels, None, similarity)
-            return {'status': 'deduplicated', 'similarity': similarity}
+            results.append({'status': 'deduplicated', 'similarity': similarity})
+            continue
 
         # Different - move to analyzed and run full pipeline
         analyzed_key = f"analyzed/{key}"
-        analyzed_url = copy_object(key, analyzed_key, source_bucket=bucket)
+        copy_object(key, analyzed_key, source_bucket=bucket)
         print(f"Copied to analyzed bucket as {analyzed_key}. Running full analysis.")
 
-        # Run existing Grok pipeline (reuse the service)
-        s3_url = analyzed_url
+        # Presign URL so Grok can fetch from private bucket
+        from snaptrash_ingestion.services.s3_client import presign_get
+        s3_url = presign_get(analyzed_key, expires=3600)
         vision_result = analyze_image(s3_url)
 
-        # Build minimal ScanRow (extend with restaurant_id from event)
+        # Stage 3+4 — full enrichment + sustainability metrics (matches /scan route)
+        enriched_food = [food_analysis.enrich(f) for f in vision_result.food_items]
+        enriched_plastic = [plastic_analysis.enrich(p) for p in vision_result.plastic_items]
+        sustain_metrics = plastic_analysis.compute_sustainability_metrics(enriched_plastic)
+
+        # Roll up metrics (exact match to scan.py)
+        food_kg = sum(f.estimated_kg for f in enriched_food)
+        compostable_kg = sum(f.estimated_kg for f in enriched_food if f.compostable and not f.contaminated)
+        contaminated_kg = sum(f.estimated_kg for f in enriched_food if f.contaminated)
+        dollar_wastage = sum(f.dollar_value or 0.0 for f in enriched_food)
+        co2_kg = sum(f.co2_kg or 0.0 for f in enriched_food)
+        plastic_count = sum(p.estimated_count for p in enriched_plastic)
+        harmful_plastic_count = sum(p.estimated_count for p in enriched_plastic if getattr(p, 'harmful', False))
+        pet_kg = sum(p.estimated_kg for p in enriched_plastic if getattr(p, 'polymer_type', None) == "PET")
+        ps_count = sum(p.estimated_count for p in enriched_plastic if getattr(p, 'polymer_type', None) == "PS")
+
+        scan_id = str(uuid.uuid4())
         row = ScanRow(
-            scan_id=f"lambda-{datetime.now(timezone.utc).isoformat()}",
+            scan_id=scan_id,
             restaurant_id=restaurant_id,
-            zip="92101",  # placeholder; extract from event/metadata in production
+            zip="92101",  # TODO: extract from S3 object metadata in prod
             neighborhood="Downtown",
             timestamp=datetime.now(timezone.utc),
-            food_kg=0.0,  # populated by enrichment in full flow
-            compostable_kg=0.0,
-            contaminated_kg=0.0,
-            dollar_wastage=0.0,
-            co2_kg=0.0,
-            plastic_count=0,
-            harmful_plastic_count=0,
-            pet_kg=0.0,
-            ps_count=0,
-            food_items_json=json.dumps([item.model_dump() for item in vision_result.food_items]),
-            plastic_items_json=json.dumps([item.model_dump() for item in vision_result.plastic_items]),
+            food_kg=food_kg,
+            compostable_kg=compostable_kg,
+            contaminated_kg=contaminated_kg,
+            dollar_wastage=dollar_wastage,
+            co2_kg=co2_kg,
+            plastic_count=plastic_count,
+            harmful_plastic_count=harmful_plastic_count,
+            pet_kg=pet_kg,
+            ps_count=ps_count,
+            total_plastic_kg=sustain_metrics.get("total_plastic_kg", 0.0),
+            ban_flag_count=sustain_metrics.get("ban_flag_count", 0),
+            recyclable_count=sustain_metrics.get("recyclable_count", 0),
+            food_items_json=json.dumps([f.model_dump() for f in enriched_food]),
+            plastic_items_json=json.dumps([p.model_dump() for p in enriched_plastic]),
         )
         insert_scan(row)
 
         update_last_analyzed(restaurant_id, analyzed_key, new_labels, vision_result, similarity)
-
         print(f"✅ Full analysis completed for {restaurant_id}, similarity: {similarity}")
-        return {'status': 'analyzed', 'similarity': similarity, 'scan_id': row.scan_id}
+        results.append({'status': 'analyzed', 'similarity': similarity, 'scan_id': row.scan_id})
 
-    return {'status': 'no_records'}
+    return results if results else {'status': 'no_records'}
 
 
 def get_last_analyzed(restaurant_id: str) -> dict:

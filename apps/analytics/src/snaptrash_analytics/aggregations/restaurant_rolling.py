@@ -108,7 +108,23 @@ def main():
 
         execute(
             f"""
-            INSERT INTO {INSIGHTS} VALUES (
+            MERGE INTO {INSIGHTS} AS t
+            USING (SELECT :restaurant_id AS restaurant_id, CAST(:computed_at AS TIMESTAMP) AS computed_at) AS s
+            ON t.restaurant_id = s.restaurant_id
+            WHEN MATCHED THEN UPDATE SET
+              weekly_dollar_waste = :weekly_dollar_waste,
+              top_waste_category = :top,
+              recommendation = :rec,
+              co2_avoided = :co2,
+              sustainability_score = :sustainability_score,
+              badge_tier = :badge_tier,
+              score_feedback_message = :score_feedback_message,
+              computed_at = :computed_at
+            WHEN NOT MATCHED THEN INSERT (
+              restaurant_id, computed_at, weekly_dollar_waste,
+              forecast_next_week, locality_percentile, top_waste_category,
+              recommendation, co2_avoided, sustainability_score, badge_tier, score_feedback_message
+            ) VALUES (
               :restaurant_id, :computed_at, :weekly_dollar_waste,
               0.0, 0.0, :top, :rec, :co2,
               :sustainability_score, :badge_tier, :score_feedback_message

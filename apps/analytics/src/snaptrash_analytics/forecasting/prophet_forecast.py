@@ -11,11 +11,6 @@ from prophet import Prophet
 from snaptrash_common.databricks_client import execute, fetch_all
 from snaptrash_common.tables import SCANS, INSIGHTS
 
-mlflow.set_experiment("/snaptrash/prophet")
-try:
-    mlflow.autolog(silent=True)
-except Exception:
-    pass
 
 
 SQL_DAILY = f"""
@@ -30,8 +25,18 @@ ORDER BY restaurant_id, ds
 """
 
 INSERT_INSIGHT = f"""
-INSERT INTO {INSIGHTS} VALUES (
-  :restaurant_id, :computed_at, 0.0, :forecast, 0.0, 'food', :rec, 0.0
+MERGE INTO {INSIGHTS} AS t
+USING (SELECT :restaurant_id AS restaurant_id, CAST(:computed_at AS TIMESTAMP) AS computed_at) AS s
+ON t.restaurant_id = s.restaurant_id
+WHEN MATCHED THEN UPDATE SET
+  forecast_next_week = :forecast,
+  recommendation = :rec
+WHEN NOT MATCHED THEN INSERT (
+  restaurant_id, computed_at, weekly_dollar_waste, forecast_next_week,
+  locality_percentile, top_waste_category, recommendation, co2_avoided,
+  sustainability_score, badge_tier, score_feedback_message
+) VALUES (
+  :restaurant_id, :computed_at, 0.0, :forecast, 0.0, 'food', :rec, 0.0, 0.0, NULL, NULL
 )
 """
 
@@ -47,6 +52,11 @@ def fit_one(df: pd.DataFrame) -> float:
 
 
 def main():
+    try:
+        mlflow.set_experiment("/snaptrash/prophet")
+        mlflow.autolog(silent=True)
+    except Exception:
+        pass
     rows = fetch_all(SQL_DAILY)
     if not rows:
         print("no scans yet — nothing to forecast")
