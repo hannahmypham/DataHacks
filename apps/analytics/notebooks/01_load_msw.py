@@ -8,8 +8,7 @@
 
 # COMMAND ----------
 import sys
-sys.path.insert(0, "/Workspace/Repos/<user>/SmartWaste/packages/common/src")
-sys.path.insert(0, "/Workspace/Repos/<user>/SmartWaste/apps/analytics/src")
+sys.path.insert(0, "/Volumes/workspace/analytics/pylib")
 
 from snaptrash_analytics.ingest.load_msw_dryad import main
 main()
