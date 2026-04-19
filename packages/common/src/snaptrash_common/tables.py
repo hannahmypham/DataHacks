@@ -1,7 +1,8 @@
 """
 Single source of truth for Delta table names + DDL.
-Both ingestion and analytics apps import from here.
-DO NOT change column names without coordinating across both apps.
+Both ingestion, analytics, and voice-alerts apps import from here.
+DO NOT change column names without coordinating across apps (per snaptrash skill and plan).
+Includes voice_alerts + new EMAIL_ALERTS for plastic threshold notifications (locality/restaurant).
 """
 from .env import settings
 
@@ -10,6 +11,8 @@ MSW_BASELINE = settings.fq_table("msw_baseline")
 INSIGHTS = settings.fq_table("insights")
 LOCALITY_AGG = settings.fq_table("locality_agg")
 ENZYME_ALERTS = settings.fq_table("enzyme_alerts")
+VOICE_ALERTS = settings.fq_table("voice_alerts")
+EMAIL_ALERTS = settings.fq_table("email_alerts")
 # Gold reference tables live in a SEPARATE analytics schema to keep
 # the snaptrash namespace clean (CV team owns workspace.snaptrash).
 _ANALYTICS_SCHEMA = f"{settings.DATABRICKS_CATALOG}.analytics"
@@ -107,7 +110,7 @@ def ddl_insights() -> str:
         zip_restaurant_count   INT,
         better_than_count      INT,
         -- sustainability score (Person B 5-signal spec, equal 20% weights)
-        sustainability_score   DOUBLE,   -- 0–100
+        sustainability_score   DOUBLE,   -- 1–4
         signal_1               DOUBLE,   -- food_vs_zip
         signal_2               DOUBLE,   -- banned+harmful plastics penalty
         signal_3               DOUBLE,   -- recyclability_rate
@@ -172,6 +175,48 @@ def ddl_enzyme_alerts() -> str:
         forecast_peak   DOUBLE,
         notified        BOOLEAN
     ) USING DELTA
+    """
+
+
+def ddl_voice_alerts() -> str:
+    """Voice alerts for plastic volume >150kg/week. Logs calls, transcripts, and Vapi outcomes."""
+    return f"""
+    CREATE TABLE IF NOT EXISTS {VOICE_ALERTS} (
+        alert_id             STRING,
+        zip                  STRING,
+        neighborhood         STRING,
+        triggered_at         TIMESTAMP,
+        plastic_volume_7day  DOUBLE,
+        threshold            DOUBLE,
+        report_context_json  STRING,
+        call_id              STRING,
+        transcript           STRING,
+        status               STRING,
+        notified             BOOLEAN,
+        ended_reason         STRING
+    ) USING DELTA
+    PARTITIONED BY (zip)
+    """
+
+
+def ddl_email_alerts() -> str:
+    """Email alerts for plastic thresholds (SMTP to hardcoded emails). Parallel to voice_alerts.
+    Logs sent_to, status, error for deduplication and auditing (per plan)."""
+    return f"""
+    CREATE TABLE IF NOT EXISTS {EMAIL_ALERTS} (
+        alert_id             STRING,
+        zip                  STRING,
+        neighborhood         STRING,
+        triggered_at         TIMESTAMP,
+        plastic_volume_7day  DOUBLE,
+        threshold            DOUBLE,
+        report_context_json  STRING,
+        sent_to              STRING,
+        status               STRING,
+        notified             BOOLEAN,
+        error                STRING
+    ) USING DELTA
+    PARTITIONED BY (zip)
     """
 
 
@@ -250,6 +295,8 @@ ALL_DDL = [
     ddl_insights,
     ddl_locality_agg,
     ddl_enzyme_alerts,
+    ddl_voice_alerts,
+    ddl_email_alerts,
     ddl_gold_wcs_benchmark,
     ddl_gold_sd_disposal_ts,
     ddl_gold_composting_routes_ca,

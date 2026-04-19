@@ -2,7 +2,9 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from snaptrash_common import settings
-from .routes import health, scan, insights
+from .routes import health, scan, analytics
+
+_REQUIRED = ["DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_WAREHOUSE_ID", "S3_BUCKET"]
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,7 +23,14 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(scan.router)
-app.include_router(insights.router)
+app.include_router(analytics.router)
+
+
+@app.on_event("startup")
+def validate_settings():
+    missing = [k for k in _REQUIRED if not getattr(settings, k, None)]
+    if missing:
+        raise RuntimeError(f"Missing required env vars: {', '.join(missing)}")
 
 
 @app.get("/")

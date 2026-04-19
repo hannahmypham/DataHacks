@@ -53,7 +53,6 @@ export type Insight = {
   weekly_dollar_waste: number;
   weekly_food_kg?: number;
   weekly_plastic_count?: number;
-  forecast_next_week?: number;
   forecast_dollar_waste?: number;
   forecast_food_kg?: number;
   forecast_plastic_count?: number;
@@ -132,3 +131,8 @@ export const getInsights = (restaurantId: string) =>
 
 export const getLocality = (zip: string) =>
   get<LocalityAgg>(`/locality/${zip}`);
+
+export type DayActual = { day: string; actual: number };
+
+export const getWeeklySeries = (restaurantId: string) =>
+  get<DayActual[]>(`/weekly-series/${restaurantId}`);

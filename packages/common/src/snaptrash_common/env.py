@@ -59,15 +59,31 @@ class _Settings:
     AWS_SECRET_ACCESS_KEY: str = _str("AWS_SECRET_ACCESS_KEY")
     S3_BUCKET: str = _str("S3_BUCKET", "snaptrash-bins")
 
-    # APIs
-    XAI_API_KEY: str = _str("XAI_API_KEY")
-    GROK_VISION_MODEL: str = _str("GROK_VISION_MODEL", "grok-2-vision-1212")
+    # APIs — support both XAI_API_KEY and GROQ_API_KEY (friend's naming)
+    XAI_API_KEY: str = _str("XAI_API_KEY") or _str("GROQ_API_KEY")
+    GROK_VISION_MODEL: str = _str("GROK_VISION_MODEL") or _str("GROQ_VISION_MODEL", "grok-2-vision-1212")
     S3_RAW_BUCKET: str = _str("S3_RAW_BUCKET", "snaptrash-raw-incoming")
     FIRECRAWL_API_KEY: str = _str("FIRECRAWL_API_KEY")
     SENDGRID_API_KEY: str = _str("SENDGRID_API_KEY")
     SENDGRID_FROM_EMAIL: str = _str("SENDGRID_FROM_EMAIL", "alerts@snaptrash.app")
     USDA_API_KEY: str = _str("USDA_API_KEY")
     MAPBOX_TOKEN: str = _str("MAPBOX_TOKEN")
+
+    # Vapi / Voice Alerts (user provides existing Assistant/Phone/Twilio integration)
+    VAPI_API_KEY: str = _str("VAPI_API_KEY")
+    VAPI_ASSISTANT_ID: str = _str("VAPI_ASSISTANT_ID")
+    VAPI_PHONE_NUMBER_ID: str = _str("VAPI_PHONE_NUMBER_ID")
+    DEFAULT_ALERT_PHONE: str = _str("DEFAULT_ALERT_PHONE", "+18582146584")
+    TEST_PHONE_OVERRIDE: str = _str("TEST_PHONE_OVERRIDE")
+
+    # SMTP for Email Alerts (Gmail App Password; see EMAIL_CONFIRMATION_SYSTEM.md)
+    # Use dedicated Gmail with 2FA + App Password (not regular password)
+    SMTP_HOST: str = _str("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = _int("SMTP_PORT", 587)
+    SMTP_USER: str = _str("SMTP_USER")
+    SMTP_PASS: str = _str("SMTP_PASS")
+    ALERT_FROM_EMAIL: str = _str("ALERT_FROM_EMAIL", "manasvinsurya.nitt02@gmail.com")
+    ALERT_TO_EMAILS: str = _str("ALERT_TO_EMAILS", "manasvinsurya.nitt02@gmail.com,mbj@ucsd.edu")
 
     # App
     ENV: str = _str("ENV", "dev")

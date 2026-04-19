@@ -51,7 +51,7 @@ const mockScan = {
 
 const mockInsight: Insight = {
   restaurant_id: RESTAURANT_ID,
-  sustainability_score: 23.5,
+  sustainability_score: 2.5,
   badge_tier: "Growing Tree",
   recommendation: "Reduce food waste volume",
   co2_avoided: 48.6,
@@ -103,10 +103,10 @@ const dailyForecast = [
 ];
 
 const SCORE_BANDS = [
-  { label: "Waste Crisis",        emoji: "🗑️", desc: "Urgent intervention needed",    min: 0,  max: 39  },
-  { label: "Reducing Impact",     emoji: "🌱", desc: "Making meaningful progress",     min: 40, max: 59  },
-  { label: "Green Operator",      emoji: "♻️", desc: "Solid sustainable practices",   min: 60, max: 79  },
-  { label: "Zero Waste Champion", emoji: "🌍", desc: "Setting the industry standard", min: 80, max: 100 },
+  { label: "Waste Crisis",        emoji: "🗑️", desc: "Urgent intervention needed",    min: 1.0, max: 1.9 },
+  { label: "Reducing Impact",     emoji: "🌱", desc: "Making meaningful progress",     min: 2.0, max: 2.7 },
+  { label: "Green Operator",      emoji: "♻️", desc: "Solid sustainable practices",   min: 2.8, max: 3.3 },
+  { label: "Zero Waste Champion", emoji: "🌍", desc: "Setting the industry standard", min: 3.4, max: 4.0 },
 ];
 
 
@@ -264,9 +264,9 @@ function LastScanCard({ scan }: { scan: LatestScan | null }) {
 function ScoreSection({ lastScan }: { lastScan: LatestScan | null }) {
   const score = mockInsight.sustainability_score ?? 0;
   const circumference = 2 * Math.PI * 140;
-  const strokeDashoffset = circumference - (score / 100) * circumference;
+  const strokeDashoffset = circumference - ((score - 1) / 3) * circumference;
   const scoreColor =
-    score >= 70 ? "hsl(var(--signal-good))" : score >= 40 ? "hsl(var(--signal-warn))" : "hsl(var(--signal-bad))";
+    score >= 3.1 ? "hsl(var(--signal-good))" : score >= 2.0 ? "hsl(var(--signal-warn))" : "hsl(var(--signal-bad))";
   const currentBand = SCORE_BANDS.findIndex((b) => score >= b.min && score <= b.max);
   const foodTrending = mockScan.weekly_food_kg > mockScan.forecast_food_kg;
 
@@ -321,7 +321,7 @@ function ScoreSection({ lastScan }: { lastScan: LatestScan | null }) {
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="mb-2 text-8xl font-extrabold tracking-tight tabular-nums">{score}</div>
+              <div className="mb-2 text-8xl font-extrabold tracking-tight tabular-nums">{score.toFixed(1)}</div>
               <div className="text-lg uppercase tracking-wide text-foreground/70">Score</div>
             </div>
           </div>

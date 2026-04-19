@@ -15,7 +15,7 @@ SnapTrash is an AI-powered restaurant waste intelligence platform. It helps rest
 - **Stores all data** in Databricks Delta Lake (a modern data lakehouse for analytics).
 - **Runs automated analytics** (aggregations, forecasts using Prophet ML model, percentile rankings vs. local restaurants, threshold alerts).
 - **Shows beautiful dashboards** with charts, maps (San Diego neighborhoods), gamification (e.g., "You're better than 77% of La Jolla restaurants!"), and live results.
-- **Triggers real-world impact**: When plastic thresholds (e.g., PET volume) are exceeded in a locality, it sends emails to enzyme labs (via SendGrid) that can break down the plastics biologically. This creates a "demand signal" loop between restaurants and innovators.
+- **Triggers real-world impact**: When plastic thresholds (150kg/week locality or 30kg/restaurant) exceeded, sends SMTP emails (to hardcoded manasvinsurya.nitt02@gmail.com + mbj@ucsd.edu) with full plastic stats report + lab rec (BluumBio from CSV). Parallel Vapi voice alerts. Creates demand signal for enzyme labs. (Implemented via voice-alerts app + EMAIL_ALERTS table; SendGrid is legacy.)
 
 **Key simplifications** (from the `snaptrash-plan.md`):
 - No barcode scanning or manufacturer ID extraction (features fully removed).
@@ -145,15 +145,15 @@ Here's how everything connects (updated to remove barcode/manufacturer features)
    - **Hourly Jobs** (SQL + Python, can be Databricks Workflows):
      - Aggregations: 7-day rolling stats per restaurant/locality (`locality_agg.py`, `restaurant_rolling.py`).
      - Forecasting: Prophet model per restaurant (time series on waste_kg/$) → predictions in `insights` table (tracked in MLflow).
-     - Threshold detection: Compare vs. MSW baselines → populate `enzyme_alerts` if PET/plastic exceeds limits.
-     - Percentile rankings, recommendations.
+     - Threshold detection: Compare vs. MSW baselines → populate `enzyme_alerts`, `locality_agg`, `email_alerts`/`voice_alerts` if plastic exceeds limits (locality 150kg/wk or restaurant 30kg/wk).
+     - Percentile rankings, recommendations, report generation for alerts.
    - **Readers**: `insights_reader.py` provides clean queries for frontend/API.
    - **Output Tables** (defined in `tables.py`):
      - `snaptrash.scans` (raw + enriched)
      - `snaptrash.msw_baseline`
      - `snaptrash.insights` (weekly stats, forecast, percentile)
      - `snaptrash.locality_agg` (neighborhood summaries, enzyme_alert flag)
-     - `snaptrash.enzyme_alerts` (for SendGrid notifications)
+     - `snaptrash.enzyme_alerts` (legacy), `voice_alerts`, `email_alerts` (for SMTP/Vapi notifications)
 
 4. **Notifications & Impact**:
    - FastAPI or Databricks job polls `enzyme_alerts`.
@@ -191,7 +191,8 @@ See `tables.py` for full CREATE TABLE SQL (partitioned Delta tables).
   - AWS IAM user with S3 bucket write access (`snaptrash-bins` — create if needed).
   - Groq API key (console.groq.com).
   - Firecrawl API key (for scraping).
-  - Optional: SendGrid, USDA API, Mapbox public token.
+  - SMTP/Gmail: Gmail account with App Password for alerts (see EMAIL_CONFIRMATION_SYSTEM.md and .env.example SMTP section).
+  - Optional: SendGrid (legacy), USDA API, Mapbox public token, VAPI keys.
 - **Tools**: 
   - Python 3.11+, `uv` (install via `curl -LsSf https://astral.sh/uv/install.sh | sh`).
   - Node.js/pnpm (for frontend).
@@ -259,7 +260,7 @@ See `tables.py` for full CREATE TABLE SQL (partitioned Delta tables).
    - **Cloud Intelligence Layer (S3 + Lambda + Rekognition)**: New S3 event-triggered Lambda on `snaptrash-raw-incoming` bucket performs change detection using Rekognition DetectLabels against DynamoDB `snaptrash-last-analyzed` reference. Similar images are deleted; different images are copied to `snaptrash-analyzed` and trigger the full Grok pipeline. See new flow in [snaptrash-plan.md](snaptrash-plan.md:67). MCP for Lambda added to `.claude/settings.json` (uses same AWS credentials as S3).
    - **Frontend Deploy**: Build with `pnpm build` → host on Vercel/Netlify (update CORS).
    - **API Deploy**: FastAPI to Railway, Fly.io, or AWS/EC2. Add env vars.
-   - **Notifications**: Implement full SendGrid polling on `enzyme_alerts`.
+   - **Notifications**: SMTP email alerts (implemented in voice-alerts/email_sender.py + EMAIL_ALERTS table) + Vapi voice. Hardcoded recipients, rich reports with stats from PlasticReportContext. SendGrid is optional legacy.
    - **MCP Integration**: The `.claude/settings.json` now includes Databricks, Firecrawl, and Lambda tools for querying live data, buckets, and Rekognition results.
    - **Notebooks**: Sync `apps/analytics/notebooks/*.py` to Databricks Repos for interactive SQL/MLflow.
    - **Branches**: Work on `dev/ingestion` or `dev/analytics`, merge to `main`.
@@ -285,6 +286,26 @@ See `tables.py` for full CREATE TABLE SQL (partitioned Delta tables).
 
 This setup gets you a **fully functional end-to-end AI waste analytics platform** in minutes once keys are configured. The architecture is production-ready with Databricks as the single source of truth.
 
-Questions? Check logs (`LOG_LEVEL=DEBUG`), Databricks query history, or the individual READMEs. Happy building!
+**Voice + Email Alerts Feature** (in `apps/voice-alerts/`): Expanded with SMTP emails (new `email_alerts` Delta table, `services/email_sender.py` using pure stdlib SMTP + rich HTML reports modeled on EMAIL_CONFIRMATION_SYSTEM.md). 
 
-*Last updated: Based on current repo state (post-barcode/manufacturer removal).*
+- **Trigger**: `uv run --project apps/voice-alerts python -m snaptrash_voice_alerts.trigger` (or with specific_zip). Uses `generate_plastic_report()` + `generate_restaurant_plastic_reports(30.0)` from `report.py` (queries `scans_unified` for >150kg locality or >30kg per-restaurant). Always returns sample report > threshold for demo (even if 0 DB rows), so calls/emails always trigger on repeat runs (no duplicate check).
+- **Email**: Sends one email per run to hardcoded `ALERT_TO_EMAILS` (manasvinsurya.nitt02@gmail.com, mbj@ucsd.edu—the enzyme company) with report on plastic volume/types in the locality exceeding limits and request for their plastic-eating enzymes. Uses updated paragraphs below the stats table.
+- **Voice**: Unchanged Vapi calls (to +18582146584 or TEST_PHONE_OVERRIDE) via `vapi_client.py`.
+- **Setup**: Run `bootstrap_databricks.py` (now includes EMAIL_ALERTS DDL via ALL_DDL). Set SMTP_*, ALERT_*, VAPI_* in `.env` (Gmail App Password required). Update Vapi Assistant prompt with report vars.
+- **Flow**: ReportContext -> email_sender.send_batch_alert_emails() (Gmail-friendly HTML tables) + Vapi. See updated `trigger.py`, `report.py`, schemas/tables.py, and `VAPI_TWILIO_VOICE_CALLING_INTEGRATION.md`.
+
+Mermaid for alert flow (updated for demo):
+
+```mermaid
+graph TD
+    A[scans_unified / locality_agg] --> B[generate_plastic_report + generate_restaurant_plastic_reports<br/>thresholds 150/30kg]
+    B --> C{Exceeds?}
+    C -->|Yes| D[PlasticReportContext + CSV labs]
+    D --> E[log to EMAIL_ALERTS / VOICE_ALERTS]
+    E --> F[send_plastic_alert_email (SMTP to manas... + mbj@ucsd.edu)<br/>rich HTML stats table]
+    E --> G[VapiClient.initiate_call (voice)]
+```
+
+See `snaptrash-plan.md` (for original architecture) and this doc for full updated flow including SMTP emails. Questions? Check logs (`LOG_LEVEL=DEBUG`), Databricks query history, EMAIL_ALERTS/voice_alerts tables, or the individual READMEs. Happy building!
+
+*Last updated: Voice + Email Alerts integration (SMTP, EMAIL_ALERTS table, restaurant support, duplicate check removed for demo) added Apr 2026. Based on current repo state (post-barcode/manufacturer removal). Follows snaptrash-core.mdc and skills.*

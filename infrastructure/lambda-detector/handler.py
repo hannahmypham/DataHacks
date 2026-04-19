@@ -96,7 +96,7 @@ def lambda_handler(event, context):
         # Different - copy to snaptrash-bins (NEVER write back to source bucket
         # snaptrash-raw-incoming, which is the Lambda trigger — doing so causes recursion).
         analyzed_key = f"analyzed/{key}"
-        ANALYZED_BUCKET = "snaptrash-bins"
+        ANALYZED_BUCKET = settings.S3_BUCKET
         copy_object(key, analyzed_key, source_bucket=bucket, dest_bucket=ANALYZED_BUCKET)
         print(f"Copied to {ANALYZED_BUCKET} as {analyzed_key}. Running full analysis.")
 
