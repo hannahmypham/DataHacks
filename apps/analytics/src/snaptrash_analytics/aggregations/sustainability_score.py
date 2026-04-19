@@ -164,6 +164,7 @@ SELECT
   AVG(food_kg + pet_kg + ps_count * 0.02)        AS avg_scan_weight
 FROM {SCANS_UNIFIED}
 WHERE timestamp >= NOW() - INTERVAL 7 DAYS
+  AND restaurant_id NOT LIKE 'synth-%'
 GROUP BY restaurant_id
 """
 
@@ -174,17 +175,27 @@ SELECT
 FROM {SCANS_UNIFIED}
 WHERE timestamp BETWEEN NOW() - INTERVAL 14 DAYS
                     AND NOW() - INTERVAL  7 DAYS
+  AND restaurant_id NOT LIKE 'synth-%'
 GROUP BY restaurant_id
 """
 
-# ZIP averages — pooled across restaurants in the same ZIP (this week)
+# ZIP averages — per-restaurant weekly totals averaged across real restaurants in same ZIP.
+# Uses subquery so units match SQL_RESTAURANT_WEEK (both are weekly sums per restaurant).
 SQL_ZIP_AVG = f"""
 SELECT
   zip,
   AVG(food_kg)                                   AS zip_avg_food_kg,
-  AVG(pet_kg + ps_count * 0.02)                  AS zip_avg_plastic_kg
-FROM {SCANS_UNIFIED}
-WHERE timestamp >= NOW() - INTERVAL 7 DAYS
+  AVG(plastic_kg)                                AS zip_avg_plastic_kg
+FROM (
+  SELECT
+    zip,
+    SUM(food_kg)                                 AS food_kg,
+    SUM(pet_kg) + SUM(ps_count) * 0.02           AS plastic_kg
+  FROM {SCANS_UNIFIED}
+  WHERE timestamp >= NOW() - INTERVAL 7 DAYS
+    AND restaurant_id NOT LIKE 'synth-%'
+  GROUP BY zip, restaurant_id
+) t
 GROUP BY zip
 """
 
@@ -251,6 +262,13 @@ def main():
         r["zip"]: float(r.get("zip_avg_plastic_kg") or 0) for r in zip_rows
     }
 
+    # Count real restaurants per ZIP so we can detect self-comparison (n=1)
+    zip_real_count: dict[str, int] = defaultdict(int)
+    for r in week_rows:
+        z = r.get("zip") or ""
+        if z:
+            zip_real_count[z] += 1
+
     now = datetime.now(timezone.utc).isoformat()
     scored: list[dict] = []
 
@@ -272,16 +290,27 @@ def main():
             jsons = [jsons]
         ban_flag_count, recyclable_count = _parse_ban_and_recyclable(jsons)
 
+        # --- Benchmark ZIP averages (signals 1 & 4) ---
+        # When only 1 real restaurant in the ZIP, self-comparison makes signal trivially 100.
+        # Fall back to SD city-wide expected weekly kg as a meaningful benchmark.
+        n_zip = zip_real_count.get(zip_code, 1)
+        if n_zip > 1:
+            bench_food_kg    = zip_food_avg.get(zip_code) or sd_avg_weekly_kg or food_kg
+            bench_plastic_kg = zip_plastic_avg.get(zip_code) or plastic_kg
+        else:
+            bench_food_kg    = sd_avg_weekly_kg or zip_food_avg.get(zip_code) or food_kg
+            bench_plastic_kg = zip_plastic_avg.get(zip_code) or plastic_kg
+
         # --- Pure spec signals (Person B) ---
         s1, s2, s3, s4, s5, score = compute_all_signals_and_score(
             restaurant_food_kg=food_kg,
-            zip_avg_food_kg=zip_food_avg.get(zip_code, food_kg),
+            zip_avg_food_kg=bench_food_kg,
             ban_flag_count=ban_flag_count,
             harmful_count=harmful_count,
             recyclable_count=recyclable_count,
             total_plastic_count=plastic_count,
             restaurant_plastic_kg=plastic_kg,
-            zip_avg_plastic_kg=zip_plastic_avg.get(zip_code, plastic_kg),
+            zip_avg_plastic_kg=bench_plastic_kg,
             this_week_avg_scan_weight=this_week_avg,
             last_week_avg_scan_weight=last_week_avg,
         )
