@@ -58,14 +58,19 @@ def lambda_handler(event, context):
             results.append({'status': 'deduplicated', 'similarity': similarity})
             continue
 
-        # Different - move to analyzed and run full pipeline
+        # Different - copy to snaptrash-bins (NEVER write back to source bucket
+        # snaptrash-raw-incoming, which is the Lambda trigger — doing so causes recursion).
         analyzed_key = f"analyzed/{key}"
-        copy_object(key, analyzed_key, source_bucket=bucket)
-        print(f"Copied to analyzed bucket as {analyzed_key}. Running full analysis.")
+        ANALYZED_BUCKET = "snaptrash-bins"
+        copy_object(key, analyzed_key, source_bucket=bucket, dest_bucket=ANALYZED_BUCKET)
+        print(f"Copied to {ANALYZED_BUCKET} as {analyzed_key}. Running full analysis.")
 
-        # Presign URL so Grok can fetch from private bucket
-        from snaptrash_ingestion.services.s3_client import presign_get
-        s3_url = presign_get(analyzed_key, expires=3600)
+        # Presign URL so Grok can fetch from private bucket (must use ANALYZED_BUCKET)
+        s3_url = s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": ANALYZED_BUCKET, "Key": analyzed_key},
+            ExpiresIn=3600,
+        )
         vision_result = analyze_image(s3_url)
 
         # Stage 3+4 — full enrichment + sustainability metrics (matches /scan route)
