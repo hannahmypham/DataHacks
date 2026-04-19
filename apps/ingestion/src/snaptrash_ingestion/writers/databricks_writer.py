@@ -6,7 +6,15 @@ from snaptrash_common.schemas import ScanRow
 
 
 INSERT_SQL = f"""
-INSERT INTO {SCANS} VALUES (
+INSERT INTO {SCANS} (
+    scan_id, restaurant_id, zip, neighborhood, timestamp,
+    food_kg, compostable_kg, contaminated_kg,
+    dollar_wastage, co2_kg,
+    plastic_count, harmful_plastic_count,
+    pet_kg, ps_count,
+    total_plastic_kg, ban_flag_count, recyclable_count,
+    food_items_json, plastic_items_json
+) VALUES (
     :scan_id, :restaurant_id, :zip, :neighborhood, :timestamp,
     :food_kg, :compostable_kg, :contaminated_kg,
     :dollar_wastage, :co2_kg,

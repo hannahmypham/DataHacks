@@ -1,9 +1,13 @@
 from __future__ import annotations
 import json
+import logging
 import re
+from time import perf_counter
 from openai import OpenAI
 from snaptrash_common import settings
 from snaptrash_common.schemas import GrokVisionResult
+
+logger = logging.getLogger(__name__)
 
 _client: OpenAI | None = None
 
@@ -100,7 +104,10 @@ def analyze_image(image_url: str) -> GrokVisionResult:
     Returns structured waste intelligence including food/plastic breakdown,
     contamination signals, fill level, and problematic packaging detection.
     """
+    start = perf_counter()
     try:
+        logger.info(f"Grok Vision starting call with model={settings.GROK_VISION_MODEL}, URL={image_url[:60]}...")
+
         resp = client().chat.completions.create(
             model=settings.GROK_VISION_MODEL,
             messages=[
@@ -116,13 +123,21 @@ def analyze_image(image_url: str) -> GrokVisionResult:
             max_tokens=2000,
         )
 
+        duration = perf_counter() - start
         raw = resp.choices[0].message.content or "{}"
+        logger.info(f"Grok Vision completed in {duration:.2f}s (model={settings.GROK_VISION_MODEL})")
+
         data = _extract_json(raw)
-        return GrokVisionResult(**data)
+        result = GrokVisionResult(**data)
+        logger.info(f"Grok parsed {len(result.food_items)} food and {len(result.plastic_items)} plastic items")
+        return result
 
     except Exception as e:
-        print(f"❌ Grok Vision error: {type(e).__name__}: {e}")
-        # Return minimal valid response as fallback
+        duration = perf_counter() - start
+        logger.error(f"Grok Vision failed after {duration:.2f}s: {type(e).__name__}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        # Return minimal valid response as fallback (matches prompt schema)
         return GrokVisionResult(
             food_items=[],
             plastic_items=[],
@@ -130,5 +145,7 @@ def analyze_image(image_url: str) -> GrokVisionResult:
             plastic_percent=50,
             fill_level_percent=60,
             contamination_severity="medium",
-            problematic_packaging=[]
+            problematic_packaging=[],
+            similarity_score=0.0,
+            cache_hit=False,
         )

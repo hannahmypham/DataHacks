@@ -256,11 +256,11 @@ See `tables.py` for full CREATE TABLE SQL (partitioned Delta tables).
 
 8. **Advanced / Production**:
    - **Databricks Workflows**: Schedule hourly aggregations/forecasts/thresholds (use notebooks or jobs).
-   - **S3 Triggers**: Optionally add Lambda on S3 PUT to trigger ingestion (current is API-driven).
+   - **Cloud Intelligence Layer (S3 + Lambda + Rekognition)**: New S3 event-triggered Lambda on `snaptrash-raw-incoming` bucket performs change detection using Rekognition DetectLabels against DynamoDB `snaptrash-last-analyzed` reference. Similar images are deleted; different images are copied to `snaptrash-analyzed` and trigger the full Grok pipeline. See new flow in [snaptrash-plan.md](snaptrash-plan.md:67). MCP for Lambda added to `.claude/settings.json` (uses same AWS credentials as S3).
    - **Frontend Deploy**: Build with `pnpm build` → host on Vercel/Netlify (update CORS).
    - **API Deploy**: FastAPI to Railway, Fly.io, or AWS/EC2. Add env vars.
    - **Notifications**: Implement full SendGrid polling on `enzyme_alerts`.
-   - **MCP Integration**: The `.claude/settings.json` enables Databricks/Firecrawl tools in Cursor/Claude for querying live data.
+   - **MCP Integration**: The `.claude/settings.json` now includes Databricks, Firecrawl, and Lambda tools for querying live data, buckets, and Rekognition results.
    - **Notebooks**: Sync `apps/analytics/notebooks/*.py` to Databricks Repos for interactive SQL/MLflow.
    - **Branches**: Work on `dev/ingestion` or `dev/analytics`, merge to `main`.
    - **Tests**: `uv run pytest` in app dirs.

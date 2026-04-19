@@ -64,17 +64,23 @@ FastAPI (orchestrator)
 
 ---
 
-### STAGE 1 — Image Capture
+### STAGE 1 — Image Capture (Refined with Change Detection)
 
 ```
-INPUT:  Restaurant opens app → taps "Snap Bin" → camera opens
-OUTPUT: Image uploaded to AWS S3
+INPUT:  Mobile camera upload to snaptrash-raw-incoming S3 bucket
+OUTPUT: Only meaningful changes trigger Grok analysis (deduplication via Lambda + Rekognition)
 
-Tool:   Lovable frontend (React camera API)
-        → AWS S3 presigned URL upload
-        → AWS Lambda triggered on S3 PUT
+Cloud Layer:
+- S3 PUT to raw-incoming → Lambda (Rekognition DetectLabels vs DynamoDB last_analyzed reference)
+- Similar → delete + update timestamp
+- Different → copy to snaptrash-analyzed bucket → full Grok vision pipeline
 
-S3 path: s3://snaptrash-bins/{restaurant_id}/{unix_timestamp}.jpg
+S3 paths: 
+  raw: s3://snaptrash-raw-incoming/{restaurant_id}/{timestamp}.jpg
+  analyzed: s3://snaptrash-analyzed/{restaurant_id}/{timestamp}.jpg
+```
+
+See updated architecture diagram in DETAILED-OVERVIEW.md and the Lambda handler in infrastructure/lambda-detector/handler.py.
 ```
 
 ---

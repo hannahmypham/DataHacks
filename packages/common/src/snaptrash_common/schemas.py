@@ -44,6 +44,8 @@ class GrokVisionResult(BaseModel):
     fill_level_percent: int = 60
     contamination_severity: str = "medium"  # low | medium | high
     problematic_packaging: list[str] = []
+    similarity_score: float = 1.0
+    cache_hit: bool = False
 
 
 class ScanRow(BaseModel):

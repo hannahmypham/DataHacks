@@ -1,7 +1,13 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from snaptrash_common import settings
 from .routes import health, scan
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+)
 
 app = FastAPI(title="SnapTrash Ingestion API", version="0.1.0")
 

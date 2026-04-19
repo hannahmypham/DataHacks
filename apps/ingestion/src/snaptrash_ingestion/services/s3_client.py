@@ -41,3 +41,27 @@ def presign_get(key: str, expires: int = 3600) -> str:
         Params={"Bucket": settings.S3_BUCKET, "Key": key},
         ExpiresIn=expires,
     )
+
+
+def get_object_bytes(key: str, bucket: str | None = None) -> bytes:
+    """Get raw bytes from S3 object (used by Lambda for comparison)."""
+    b = bucket or settings.S3_BUCKET
+    response = s3().get_object(Bucket=b, Key=key)
+    return response['Body'].read()
+
+
+def copy_object(
+    source_key: str,
+    dest_key: str,
+    source_bucket: str | None = None,
+    dest_bucket: str | None = None,
+) -> str:
+    """Copy S3 object (e.g. from raw-incoming to analyzed bucket). Returns new URL."""
+    src_b = source_bucket or settings.S3_BUCKET
+    dst_b = dest_bucket or settings.S3_BUCKET  # update with dedicated analyzed bucket var if added to settings
+    s3().copy_object(
+        Bucket=dst_b,
+        CopySource={"Bucket": src_b, "Key": source_key},
+        Key=dest_key,
+    )
+    return f"https://{dst_b}.s3.{settings.AWS_REGION}.amazonaws.com/{dest_key}"
