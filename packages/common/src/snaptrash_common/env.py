@@ -36,8 +36,8 @@ class Settings(BaseSettings):
     S3_BUCKET: str = "snaptrash-bins"
 
     # APIs
-    GROQ_API_KEY: str = ""
-    GROQ_VISION_MODEL: str = "llama-4-scout-17b-16e-instruct"
+    XAI_API_KEY: str = ""
+    GROK_VISION_MODEL: str = "grok-2-vision-1212"
     FIRECRAWL_API_KEY: str = ""
     SENDGRID_API_KEY: str = ""
     SENDGRID_FROM_EMAIL: str = "alerts@snaptrash.app"

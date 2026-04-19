@@ -20,16 +20,19 @@ def s3():
 
 
 def upload_image(data: bytes, *, restaurant_id: str, ts: int, content_type: str = "image/jpeg") -> str:
-    """Upload bytes to s3://{bucket}/{restaurant_id}/{ts}.jpg, return https URL."""
+    """Upload bytes to S3 and return a presigned URL (works with private buckets)."""
     ext = "jpg" if "jpeg" in content_type else content_type.split("/")[-1]
     key = f"{restaurant_id}/{ts}.{ext}"
+
     s3().put_object(
         Bucket=settings.S3_BUCKET,
         Key=key,
         Body=data,
         ContentType=content_type,
     )
-    return f"https://{settings.S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/{key}"
+
+    # Return presigned URL (valid for 1 hour) instead of public URL
+    return presign_get(key, expires=3600)
 
 
 def presign_get(key: str, expires: int = 3600) -> str:

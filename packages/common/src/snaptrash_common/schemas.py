@@ -34,9 +34,15 @@ class PlasticItem(BaseModel):
     alert: str | None = None
 
 
-class GroqVisionResult(BaseModel):
+class GrokVisionResult(BaseModel):
     food_items: list[FoodItem] = []
     plastic_items: list[PlasticItem] = []
+    # New top-level waste intelligence fields (used by future analytics)
+    organics_percent: int = 50
+    plastic_percent: int = 50
+    fill_level_percent: int = 60
+    contamination_severity: str = "medium"  # low | medium | high
+    problematic_packaging: list[str] = []
 
 
 class ScanRow(BaseModel):

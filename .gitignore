@@ -53,3 +53,6 @@ Thumbs.db
 
 # claude local overrides
 .claude/settings.local.json
+
+# pnpm store (created during dependency setup)
+.pnpm-store/

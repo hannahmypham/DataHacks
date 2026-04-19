@@ -1,4 +1,7 @@
-"""Idempotent: create snaptrash schema + all Delta tables. Run once after .env is filled."""
+"""Idempotent: create snaptrash schema + all Delta tables. Run once after .env is filled.
+
+Run with: uv run --project apps/ingestion python scripts/bootstrap_databricks.py
+"""
 from __future__ import annotations
 from snaptrash_common.databricks_client import execute
 from snaptrash_common.tables import ddl_create_schema, ALL_DDL
