@@ -4,7 +4,14 @@
 # MAGIC Schedule daily.
 
 # COMMAND ----------
-# MAGIC %pip install -q prophet
+# Install prophet only if not already available (avoids 2-3 min reinstall on warm clusters)
+try:
+    import prophet  # noqa: F401
+    print("prophet already installed — skipping pip install")
+except ImportError:
+    import subprocess, sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "prophet"])
+    print("prophet installed")
 
 # COMMAND ----------
 import sys

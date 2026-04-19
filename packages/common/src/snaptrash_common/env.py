@@ -51,6 +51,7 @@ class _Settings:
     DATABRICKS_WAREHOUSE_ID: str = _str("DATABRICKS_WAREHOUSE_ID")
     DATABRICKS_CATALOG: str = _str("DATABRICKS_CATALOG", "workspace")
     DATABRICKS_SCHEMA: str = _str("DATABRICKS_SCHEMA", "snaptrash")
+    DATABRICKS_USER: str = _str("DATABRICKS_USER", "ara023@ucsd.edu")
 
     # AWS
     AWS_REGION: str = _str("AWS_REGION", "us-west-2")

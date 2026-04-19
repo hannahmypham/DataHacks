@@ -3,10 +3,13 @@ Quick runner: upload pylib → run 02_aggregations → 03_prophet_forecast.
 Skips 01b (gold tables already loaded).
 
 Usage:
-  python scripts/run_pipeline.py
+  python scripts/run_pipeline.py           # full: 02 + 03 (aggregations + Prophet)
+  python scripts/run_pipeline.py --fast    # fast: 02 only (~2 min, no Prophet)
 """
 from __future__ import annotations
 import base64, json, os, pathlib, sys, time, urllib.parse, urllib.request
+
+FAST_MODE = "--fast" in sys.argv
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 for line in (ROOT / ".env").read_text().splitlines():
@@ -67,11 +70,15 @@ def upload_pylib():
     print(f"   {count} files uploaded")
 
 
-# 2. Upload & run 02→03
-NOTEBOOKS = [
-    ("02_aggregations.py",   "02_aggregations"),
+# 2. Upload & run 02→03 (or 02 only in --fast mode)
+NOTEBOOKS_FULL = [
+    ("02_aggregations.py",     "02_aggregations"),
     ("03_prophet_forecast.py", "03_prophet_forecast"),
 ]
+NOTEBOOKS_FAST = [
+    ("02_aggregations.py",     "02_aggregations"),
+]
+NOTEBOOKS = NOTEBOOKS_FAST if FAST_MODE else NOTEBOOKS_FULL
 
 def upload_notebooks():
     print("→ uploading notebooks …")
