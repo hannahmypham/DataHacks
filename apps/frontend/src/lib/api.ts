@@ -77,6 +77,11 @@ export type Insight = {
   nearest_facility_km?: number;
   harmful_plastic_count?: number;
   ban_flag_count?: number;
+  signal_1?: number;
+  signal_2?: number;
+  signal_3?: number;
+  signal_4?: number;
+  signal_5?: number;
   signals?: Record<string, any>;
   enzyme_alert?: boolean;
 };

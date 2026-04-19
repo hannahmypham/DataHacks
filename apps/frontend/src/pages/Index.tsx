@@ -1,10 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import {
-  TrendingUp,
   Calendar,
   AlertTriangle,
   Package,
-  Gauge,
   Factory,
   MapPin,
 } from "lucide-react";
@@ -18,11 +16,8 @@ import {
   Tooltip,
 } from "recharts";
 import type {
-  ScanResponse,
   Insight,
   LocalityAgg,
-  FoodItem,
-  PlasticItem,
   LatestScan,
 } from "@/lib/api";
 import { getInsights, getLocality, getLatestScan } from "@/lib/api";
@@ -38,30 +33,24 @@ const ZIP = "92101";
 const KG_TO_LBS = 2.20462;
 const KM_TO_MI = 0.621371;
 
-const mockScan: ScanResponse = {
-  weekly_food_kg: 8.6,   // stored as kg internally; display in lbs
-  forecast_food_kg: 10.2,
-  weekly_plastic_count: 40,
+// Local mock type — holds display fields not in ScanResponse API type
+const mockScan = {
+  weekly_food_kg: 27.6,
+  forecast_food_kg: 27.7,
+  weekly_plastic_count: 25,
   weekly_dollar_waste: 42.0,
   forecast_next_week: 48.0,
-  top_waste_category: "Produce",
-  food_items: [
-    { name: "Lettuce & Greens", weight_kg: 3.1 },
-    { name: "Tomatoes", weight_kg: 2.4 },
-    { name: "Bread & Grains", weight_kg: 1.8 },
-    { name: "Dairy", weight_kg: 1.3 },
-  ] satisfies FoodItem[],
   plastic_items: [
-    { name: "Single-use cups", count: 48 },
-    { name: "Straws", count: 22, banned: true },
-    { name: "Polystyrene", count: 14, harmful: true, banned: true },
-    { name: "Cling film", count: 18, harmful: true },
-    { name: "Cutlery", count: 24 },
-  ] satisfies PlasticItem[],
+    { name: "Single-use cups", harmful: false, banned: false },
+    { name: "Straws", harmful: false, banned: true },
+    { name: "Polystyrene", harmful: true, banned: true },
+    { name: "Cling film", harmful: true, banned: false },
+    { name: "Cutlery", harmful: false, banned: false },
+  ],
 };
 
-// TODO: replace with live API call -> getInsights()
 const mockInsight: Insight = {
+  restaurant_id: RESTAURANT_ID,
   sustainability_score: 23.5,
   badge_tier: "Growing Tree",
   recommendation: "Reduce food waste volume",
@@ -73,14 +62,22 @@ const mockInsight: Insight = {
   signal_5: 76,
   score_feedback_message: "You're outperforming most peers in your area.",
   nearest_facility_name: "Mission Valley Organics",
-  nearest_facility_km: 2.4,  // stored as km; display in miles
-};
-
-// TODO: replace with live API call -> getLocality()
-const mockLocality: LocalityAgg = {
-  locality_percentile: 67,
+  nearest_facility_km: 2.4,
+  weekly_dollar_waste: 42.0,
+  top_waste_category: "Produce",
+  locality_percentile: 0.67,
   better_than_count: 4,
   zip_restaurant_count: 6,
+};
+
+const mockLocality: LocalityAgg = {
+  zip: ZIP,
+  neighborhood: "Downtown San Diego",
+  total_pet_kg: 0,
+  total_ps_count: 0,
+  harmful_count: 0,
+  active_restaurants: 6,
+  enzyme_alert: false,
 };
 
 // TODO: replace with live API call (7-day actual vs forecast time series, lbs)
@@ -105,53 +102,13 @@ const dailyForecast = [
   { day: "Sun", value: 11.3 },
 ];
 
-const PLANT_STAGES: { tier: Insight["badge_tier"]; emoji: string; min: number; max: number }[] = [
-  { tier: "Seedling", emoji: "🌱", min: 0, max: 39 },
-  { tier: "Growing Plant", emoji: "🌿", min: 40, max: 59 },
-  { tier: "Growing Tree", emoji: "🌲", min: 60, max: 79 },
-  { tier: "Thriving Forest", emoji: "🌳", min: 80, max: 100 },
+const SCORE_BANDS = [
+  { label: "Waste Crisis",        emoji: "🗑️", desc: "Urgent intervention needed",    min: 0,  max: 39  },
+  { label: "Reducing Impact",     emoji: "🌱", desc: "Making meaningful progress",     min: 40, max: 59  },
+  { label: "Green Operator",      emoji: "♻️", desc: "Solid sustainable practices",   min: 60, max: 79  },
+  { label: "Zero Waste Champion", emoji: "🌍", desc: "Setting the industry standard", min: 80, max: 100 },
 ];
 
-const SIGNAL_DETAILS: Record<
-  string,
-  { value: number; status: "good" | "warning" | "critical"; label: string; description: string; metric: string }
-> = {
-  S1: {
-    value: mockInsight.signal_1,
-    status: "good",
-    label: "Waste Reduction",
-    description: "Measures daily waste volume reduction vs. baseline",
-    metric: "↓ 18% from baseline",
-  },
-  S2: {
-    value: mockInsight.signal_2,
-    status: "warning",
-    label: "Separation Quality",
-    description: "Quality of waste stream separation (recyclables, compost, trash)",
-    metric: "45% correctly sorted",
-  },
-  S3: {
-    value: mockInsight.signal_3,
-    status: "good",
-    label: "Compost Diversion",
-    description: "Percentage of organic waste diverted to composting",
-    metric: "91% diverted",
-  },
-  S4: {
-    value: mockInsight.signal_4,
-    status: "critical",
-    label: "Plastic Reduction",
-    description: "Single-use plastic items eliminated from waste stream",
-    metric: "Only 38% reduction",
-  },
-  S5: {
-    value: mockInsight.signal_5,
-    status: "good",
-    label: "Consistency",
-    description: "Day-to-day consistency in sustainable waste practices",
-    metric: "76% consistent",
-  },
-};
 
 // Background images (Unsplash, same as Figma source)
 const BG = {
@@ -165,7 +122,6 @@ const BG = {
     "url(https://images.unsplash.com/photo-1761212601062-448fdab7db68?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1920)",
 };
 
-const PLASTIC_THRESHOLD = 50;
 
 /* ------------------------------------------------------------------ */
 /* Sub-components                                                      */
@@ -306,20 +262,13 @@ function LastScanCard({ scan }: { scan: LatestScan | null }) {
 }
 
 function ScoreSection({ lastScan }: { lastScan: LatestScan | null }) {
-  const score = mockInsight.sustainability_score;
-  const [hoveredSignal, setHoveredSignal] = useState<string | null>(null);
+  const score = mockInsight.sustainability_score ?? 0;
   const circumference = 2 * Math.PI * 140;
   const strokeDashoffset = circumference - (score / 100) * circumference;
   const scoreColor =
     score >= 70 ? "hsl(var(--signal-good))" : score >= 40 ? "hsl(var(--signal-warn))" : "hsl(var(--signal-bad))";
-  const currentStage = PLANT_STAGES.findIndex((s) => score >= s.min && score <= s.max);
-
-  const signalBg = (status: string) =>
-    status === "good"
-      ? "bg-signal-good border-signal-good"
-      : status === "warning"
-        ? "bg-signal-warn border-signal-warn"
-        : "bg-signal-bad border-signal-bad";
+  const currentBand = SCORE_BANDS.findIndex((b) => score >= b.min && score <= b.max);
+  const foodTrending = mockScan.weekly_food_kg > mockScan.forecast_food_kg;
 
   return (
     <SectionShell bg={BG.score}>
@@ -327,17 +276,17 @@ function ScoreSection({ lastScan }: { lastScan: LatestScan | null }) {
         {/* Live scan feed */}
         <LastScanCard scan={lastScan} />
 
-        {/* Plant growth */}
+        {/* Score bands */}
         <div className="mb-12">
           <h3 className="mb-6 text-center text-sm uppercase tracking-[0.25em] text-foreground/60">
-            Growth Progression
+            Impact Rating
           </h3>
           <div className="mb-8 flex justify-center gap-4 sm:gap-6">
-            {PLANT_STAGES.map((stage, index) => {
-              const active = index === currentStage;
+            {SCORE_BANDS.map((band, index) => {
+              const active = index === currentBand;
               return (
                 <div
-                  key={stage.tier}
+                  key={band.label}
                   className={`flex flex-col items-center transition-all duration-300 ${
                     active ? "scale-110" : "scale-90 opacity-40"
                   }`}
@@ -349,9 +298,10 @@ function ScoreSection({ lastScan }: { lastScan: LatestScan | null }) {
                         : "border-foreground/10 bg-foreground/5"
                     }`}
                   >
-                    <span className="text-4xl">{stage.emoji}</span>
+                    <span className="text-4xl">{band.emoji}</span>
                   </div>
-                  <span className="text-center text-xs">{stage.tier}</span>
+                  <span className="text-center text-xs font-semibold">{band.label}</span>
+                  {active && <span className="mt-1 text-center text-xs opacity-60">{band.desc}</span>}
                 </div>
               );
             })}
@@ -362,24 +312,11 @@ function ScoreSection({ lastScan }: { lastScan: LatestScan | null }) {
         <div className="mb-10 flex flex-col items-center">
           <div className="relative mb-8">
             <svg width="320" height="320" className="-rotate-90 transform">
+              <circle cx="160" cy="160" r="140" stroke="hsl(0 0% 100% / 0.15)" strokeWidth="20" fill="none" />
               <circle
-                cx="160"
-                cy="160"
-                r="140"
-                stroke="hsl(0 0% 100% / 0.15)"
-                strokeWidth="20"
-                fill="none"
-              />
-              <circle
-                cx="160"
-                cy="160"
-                r="140"
-                stroke={scoreColor}
-                strokeWidth="20"
-                fill="none"
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
+                cx="160" cy="160" r="140"
+                stroke={scoreColor} strokeWidth="20" fill="none" strokeLinecap="round"
+                strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
                 style={{ transition: "stroke-dashoffset 1.5s ease-out" }}
               />
             </svg>
@@ -389,52 +326,72 @@ function ScoreSection({ lastScan }: { lastScan: LatestScan | null }) {
             </div>
           </div>
 
-          {/* Comparison */}
-          <div className="mb-6 rounded-xl border border-signal-good/40 bg-signal-good/20 px-6 py-3 backdrop-blur-md">
-            <p className="text-center text-sm">
-              Better than{" "}
-              <span className="font-bold">
-                {mockLocality.better_than_count} of {mockLocality.zip_restaurant_count}
-              </span>{" "}
-              restaurants in Downtown SD
+          {/* Recommendation */}
+          <div className="mb-8 w-full rounded-xl border border-signal-info/40 bg-signal-info/20 px-4 py-2.5 backdrop-blur-md">
+            <p className="truncate text-center text-sm font-semibold">
+              💡 AI-powered waste tracking — scan, analyze, and reduce your footprint
             </p>
           </div>
 
-          {/* Recommendation */}
-          <div className="mb-8 rounded-xl border border-signal-info/40 bg-signal-info/20 px-6 py-3 backdrop-blur-md">
-            <p className="text-center text-sm font-semibold">💡 {mockInsight.recommendation}</p>
-          </div>
-
-          {/* Signal pills */}
-          <div className="flex flex-wrap justify-center gap-3">
-            {Object.entries(SIGNAL_DETAILS).map(([key, signal]) => (
-              <div key={key} className="relative">
-                <button
-                  type="button"
-                  onMouseEnter={() => setHoveredSignal(key)}
-                  onMouseLeave={() => setHoveredSignal(null)}
-                  onFocus={() => setHoveredSignal(key)}
-                  onBlur={() => setHoveredSignal(null)}
-                  className={`${signalBg(
-                    signal.status,
-                  )} cursor-pointer rounded-full border px-4 py-2 text-white transition-transform hover:scale-105`}
-                >
-                  <span className="font-bold">{key}</span> {signal.value}
-                </button>
-                {hoveredSignal === key && (
-                  <div
-                    className="absolute left-1/2 top-full z-20 mt-2 w-64 -translate-x-1/2 rounded-xl border border-brand-card-border/40 bg-brand-card/95 p-4 shadow-2xl backdrop-blur-xl"
-                    style={{ boxShadow: "0 10px 40px hsl(0 0% 0% / 0.6)" }}
-                  >
-                    <h4 className="mb-1 text-sm font-bold text-brand-tan">{signal.label}</h4>
-                    <p className="mb-2 text-xs opacity-80">{signal.description}</p>
-                    <div className="rounded-lg border border-foreground/20 bg-foreground/10 px-3 py-1.5 text-xs">
-                      {signal.metric}
-                    </div>
+          {/* Local ranking + food waste row */}
+          <div className="grid w-full gap-4 sm:grid-cols-2">
+            {/* Local Ranking */}
+            {(() => {
+              const better = mockInsight.better_than_count ?? 4;
+              const total = mockInsight.zip_restaurant_count ?? 6;
+              const rank = Math.max(1, total - better);
+              const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
+              const cardStyle =
+                rank === 1
+                  ? "card-brand border-yellow-400/60 bg-yellow-400/10"
+                  : rank === 2
+                    ? "card-brand border-gray-300/50 bg-gray-300/10"
+                    : rank === 3
+                      ? "card-brand border-amber-600/50 bg-amber-600/10"
+                      : "card-brand";
+              return (
+                <div className={cardStyle}>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="stat-label">Local Ranking</div>
+                    {medal && <span className="text-3xl">{medal}</span>}
                   </div>
-                )}
+                  <div className="mb-1 flex items-baseline gap-2">
+                    <div className="stat-num-xl">#{rank}</div>
+                    <div className="text-xl opacity-70">of {total}</div>
+                  </div>
+                  <div className="mb-3 text-xs opacity-60">restaurants in ZIP 92101</div>
+                  <div className="flex gap-1.5">
+                    {Array.from({ length: total }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`h-2 flex-1 rounded-full ${
+                          i + 1 === rank
+                            ? rank === 1 ? "bg-yellow-400" : rank === 2 ? "bg-gray-300" : rank === 3 ? "bg-amber-600" : "bg-signal-info"
+                            : i + 1 < rank
+                              ? "bg-signal-info"
+                              : "bg-foreground/20"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Current Food Waste + trend */}
+            <div className="card-brand">
+              <div className="stat-label mb-3">Food Waste This Week</div>
+              <div className="mb-2 flex items-baseline gap-2">
+                <div className="stat-num-xl">{(mockScan.weekly_food_kg * KG_TO_LBS).toFixed(1)}</div>
+                <div className="text-xl opacity-70">lbs</div>
+                <span className={`ml-1 text-2xl font-bold ${foodTrending ? "text-signal-bad" : "text-signal-good"}`}>
+                  {foodTrending ? "↑" : "↓"}
+                </span>
               </div>
-            ))}
+              <div className={`text-sm font-semibold ${foodTrending ? "text-signal-bad" : "text-signal-good"}`}>
+                {foodTrending ? "Above forecast — review inventory" : "Below forecast — great control"}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -443,6 +400,7 @@ function ScoreSection({ lastScan }: { lastScan: LatestScan | null }) {
 }
 
 function WasteSection() {
+  const foodThreshold = 80;
   const peakDay = useMemo(
     () => weeklySeries.reduce((a, b) => (b.actual > a.actual ? b : a)),
     [],
@@ -451,8 +409,13 @@ function WasteSection() {
     { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" }[
       peakDay.day
     ] ?? peakDay.day;
-  const avgDeviation =
-    weeklySeries.reduce((s, r) => s + Math.abs(r.actual - r.forecast), 0) / weeklySeries.length;
+
+  const foodLbs = mockScan.weekly_food_kg * KG_TO_LBS;
+  const foodTrending = mockScan.weekly_food_kg > mockScan.forecast_food_kg;
+  const foodAboveThreshold = foodLbs > foodThreshold;
+  const foodThresholdPct = Math.min(100, (foodLbs / foodThreshold) * 100);
+
+  const thresholdEmoji = foodAboveThreshold ? "🚨" : foodThresholdPct > 75 ? "⚠️" : "✅";
 
   return (
     <SectionShell bg={BG.waste} overlayClass="bg-gradient-to-b from-black/75 via-black/65 to-black/75">
@@ -463,52 +426,64 @@ function WasteSection() {
         <div className="card-brand">
           <div className="stat-label">Weekly Food Waste</div>
           <div className="mb-2 flex items-baseline gap-3">
-            <div className="stat-num-xl">{(mockScan.weekly_food_kg * KG_TO_LBS).toFixed(1)}</div>
+            <div className="stat-num-xl">{foodLbs.toFixed(1)}</div>
             <div className="text-2xl opacity-70">lbs</div>
+            <span className={`text-2xl font-bold ${foodTrending ? "text-signal-bad" : "text-signal-good"}`}>
+              {foodTrending ? "↑" : "↓"}
+            </span>
           </div>
-          <div className="inline-block rounded-lg border border-signal-bad/50 bg-signal-bad/15 px-3 py-1.5">
-            <span className="text-sm font-semibold text-signal-bad">+23% vs ZIP avg</span>
+          <div className={`text-sm font-semibold ${foodTrending ? "text-signal-bad" : "text-signal-good"}`}>
+            {foodTrending ? "Trending up vs forecast" : "Trending down vs forecast"}
           </div>
         </div>
 
         {/* Weekly Dollar Waste */}
         <div className="card-brand">
           <div className="stat-label">Weekly Dollar Waste</div>
-          <div className="mb-2 stat-num-xl">${mockScan.weekly_dollar_waste.toFixed(2)}</div>
-          <div className="text-sm opacity-70">
-            Projected{" "}
-            <span className="font-bold text-signal-gold">
-              ${mockScan.forecast_next_week.toFixed(2)}
-            </span>{" "}
-            next week
+          <div className="mb-2 flex items-baseline gap-3">
+            <div className="stat-num-xl">${mockScan.weekly_dollar_waste.toFixed(2)}</div>
+          </div>
+          <div className="text-sm font-semibold opacity-60">
+            Estimated food cost lost this week
           </div>
         </div>
 
         {/* Peak Waste Day */}
         <div className="card-brand">
-          <div className="flex items-start gap-4">
-            <div className="icon-tile h-14 w-14 border-signal-good/40 bg-signal-good/20">
+          <div className="flex flex-col items-center justify-center text-center py-2">
+            <div className="icon-tile mb-3 h-14 w-14 border-signal-good/40 bg-signal-good/20">
               <Calendar className="h-7 w-7 text-signal-good" />
             </div>
-            <div className="flex-1">
-              <div className="stat-label mb-2">Peak Waste Day</div>
-              <div className="mb-1 text-3xl font-extrabold">{peakLabel}</div>
-              <div className="text-lg font-semibold text-brand-tan">{peakDay.actual.toFixed(1)} lbs</div>
-            </div>
+            <div className="stat-label mb-2">Peak Waste Day</div>
+            <div className="mb-1 text-5xl font-extrabold">{peakLabel}</div>
+            <div className="text-lg font-semibold text-brand-tan">{peakDay.actual.toFixed(1)} lbs</div>
           </div>
         </div>
 
-        {/* Avg Deviation */}
-        <div className="card-brand">
-          <div className="flex items-start gap-4">
-            <div className="icon-tile h-14 w-14 border-signal-info/40 bg-signal-info/20">
-              <TrendingUp className="h-7 w-7 text-signal-info" />
-            </div>
-            <div className="flex-1">
-              <div className="stat-label mb-2">Avg Deviation</div>
-              <div className="mb-1 text-3xl font-extrabold">±{avgDeviation.toFixed(1)}</div>
-              <div className="text-sm opacity-70">lbs from forecast</div>
-            </div>
+        {/* Food Wastage Threshold */}
+        <div className={foodAboveThreshold ? "card-brand-danger" : "card-brand"}>
+          <div className="mb-4 flex items-center justify-between">
+            <div className="stat-label">Food Wastage Threshold</div>
+            <span className="text-2xl">{thresholdEmoji}</span>
+          </div>
+          <div className="mb-1 flex items-baseline gap-2">
+            <span className="text-4xl font-extrabold tabular-nums">{foodLbs.toFixed(1)}</span>
+            <span className="opacity-70">/ {foodThreshold} lbs</span>
+          </div>
+          <div className={`mb-4 text-sm font-semibold ${foodAboveThreshold ? "text-signal-bad" : "text-signal-good"}`}>
+            {foodAboveThreshold
+              ? `${(foodLbs - foodThreshold).toFixed(1)} lbs over your limit`
+              : `${(foodThreshold - foodLbs).toFixed(1)} lbs below your limit`}
+          </div>
+          <div className="mb-2 h-3 overflow-hidden rounded-full bg-foreground/10">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${foodAboveThreshold ? "bg-signal-bad" : "bg-signal-good"}`}
+              style={{ width: `${foodThresholdPct}%` }}
+            />
+          </div>
+          <div className="mt-2 flex justify-between text-xs opacity-50">
+            <span>0 lbs</span>
+            <span>Limit: {foodThreshold} lbs/week</span>
           </div>
         </div>
       </div>
@@ -595,11 +570,16 @@ function WasteSection() {
 }
 
 function PlasticSection() {
-  const harmfulCount = mockScan.plastic_items.filter((p) => p.harmful).length;
-  const bannedCount = mockScan.plastic_items.filter((p) => p.banned).length;
+  const plasticThreshold = 50;
+  const harmfulItems = mockScan.plastic_items.filter((p) => p.harmful);
+  const bannedItems = mockScan.plastic_items.filter((p) => p.banned);
   const currentItems = mockScan.weekly_plastic_count;
-  const isAbove = currentItems > PLASTIC_THRESHOLD;
-  const pct = Math.min(100, (currentItems / PLASTIC_THRESHOLD) * 100);
+  const itemsPerDay = (currentItems / 7).toFixed(1);
+  const volumeTrending = true; // mock: plastic volume trending up
+  const itemsTrending = true;  // mock: item count trending up
+  const isAbove = currentItems > plasticThreshold;
+  const pct = Math.min(100, (currentItems / plasticThreshold) * 100);
+  const thresholdEmoji = isAbove ? "🚨" : pct > 75 ? "⚠️" : pct > 50 ? "😐" : "✅";
 
   return (
     <SectionShell bg={BG.plastic} overlayClass="bg-gradient-to-b from-black/80 via-black/75 to-black/80">
@@ -612,20 +592,28 @@ function PlasticSection() {
           <div className="mb-2 flex items-baseline gap-3">
             <div className="stat-num-xl">3.2</div>
             <div className="text-2xl opacity-70">lbs/week</div>
+            <span className={`text-2xl font-bold ${volumeTrending ? "text-signal-bad" : "text-signal-good"}`}>{volumeTrending ? "↑" : "↓"}</span>
           </div>
-          <div className="text-sm opacity-70">32% of total waste stream</div>
+          <div className={`text-sm font-semibold ${volumeTrending ? "text-signal-bad" : "text-signal-good"}`}>
+            {volumeTrending ? "Volume increasing this week" : "Volume decreasing this week"}
+          </div>
         </div>
 
-        {/* Items per Week */}
+        {/* Items per Day */}
         <div className="card-brand">
           <div className="flex items-start gap-4">
             <div className="icon-tile h-14 w-14 border-signal-info/40 bg-signal-info/20">
               <Package className="h-7 w-7 text-signal-info" />
             </div>
             <div className="flex-1">
-              <div className="stat-label mb-2">Items/Week</div>
-              <div className="mb-1 text-5xl font-extrabold tabular-nums">{currentItems}</div>
-              <div className="text-sm opacity-70">plastic items discarded</div>
+              <div className="stat-label mb-2">Items/Day</div>
+              <div className="mb-1 flex items-baseline gap-2">
+                <div className="text-5xl font-extrabold tabular-nums">{itemsPerDay}</div>
+                <span className={`text-2xl font-bold ${itemsTrending ? "text-signal-bad" : "text-signal-good"}`}>{itemsTrending ? "↑" : "↓"}</span>
+              </div>
+              <div className={`text-sm font-semibold ${itemsTrending ? "text-signal-bad" : "text-signal-good"}`}>
+                {itemsTrending ? "Daily rate rising" : "Daily rate falling"}
+              </div>
             </div>
           </div>
         </div>
@@ -643,69 +631,62 @@ function PlasticSection() {
             </h3>
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
-                <div className="stat-label mb-1">Harmful Plastics</div>
-                <div className="text-4xl font-extrabold tabular-nums text-signal-gold">
-                  {harmfulCount}
+                <div className="stat-label mb-2">Harmful Plastics</div>
+                <div className="mb-2 text-4xl font-extrabold tabular-nums text-signal-gold">
+                  {harmfulItems.length}
                 </div>
-                <div className="mt-1 text-sm opacity-70">items detected</div>
+                <ul className="space-y-1">
+                  {harmfulItems.map((p, i) => (
+                    <li key={i} className="flex items-center gap-2 text-xs">
+                      <span className="h-1.5 w-1.5 rounded-full bg-signal-gold" />
+                      <span className="capitalize opacity-80">{p.name}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
               <div>
-                <div className="stat-label mb-1">Banned Items (SB 54)</div>
-                <div className="text-4xl font-extrabold tabular-nums text-signal-bad">
-                  {bannedCount}
+                <div className="stat-label mb-2">Banned Items (SB 54)</div>
+                <div className="mb-2 text-4xl font-extrabold tabular-nums text-signal-bad">
+                  {bannedItems.length}
                 </div>
-                <div className="mt-1 text-sm opacity-70">items detected</div>
+                <ul className="space-y-1">
+                  {bannedItems.map((p, i) => (
+                    <li key={i} className="flex items-center gap-2 text-xs">
+                      <span className="h-1.5 w-1.5 rounded-full bg-signal-bad" />
+                      <span className="capitalize opacity-80">{p.name}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Threshold */}
+      {/* Interactive Threshold */}
       <div className={isAbove ? "card-brand-danger" : "card-brand"}>
-        <div className="mb-6 flex items-start gap-4">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="stat-label">Weekly Plastic Limit</div>
+          <span className="text-3xl">{thresholdEmoji}</span>
+        </div>
+        <div className="mb-1 flex items-baseline gap-3">
+          <div className="text-4xl font-extrabold tabular-nums">{currentItems}</div>
+          <div className="text-xl opacity-70">/ {plasticThreshold} items</div>
+        </div>
+        <div className={`mb-4 text-sm font-semibold ${isAbove ? "text-signal-bad" : "text-signal-good"}`}>
+          {isAbove
+            ? `🚨 ${currentItems - plasticThreshold} items over your limit`
+            : `✓ ${plasticThreshold - currentItems} items remaining in budget`}
+        </div>
+        <div className="mb-3 h-4 overflow-hidden rounded-full bg-foreground/10">
           <div
-            className={`icon-tile h-14 w-14 ${
-              isAbove ? "border-signal-bad/60 bg-signal-bad/20" : "border-signal-good/40 bg-signal-good/20"
-            }`}
-          >
-            <Gauge className={`h-7 w-7 ${isAbove ? "text-signal-bad" : "text-signal-good"}`} />
-          </div>
-          <div className="flex-1">
-            <div className="stat-label mb-2">Weekly Threshold Monitor</div>
-            <div className="mb-1 flex items-baseline gap-3">
-              <div className="text-4xl font-extrabold tabular-nums">{currentItems}</div>
-              <div className="text-xl opacity-70">/ {PLASTIC_THRESHOLD} items</div>
-            </div>
-            <div
-              className={`text-sm font-semibold ${isAbove ? "text-signal-bad" : "text-signal-good"}`}
-            >
-              {isAbove
-                ? `⚠️ ${currentItems - PLASTIC_THRESHOLD} items over threshold`
-                : "✓ Within safe threshold"}
-            </div>
-          </div>
+            className={`h-full rounded-full transition-all duration-700 ${isAbove ? "bg-signal-bad" : "bg-signal-good"}`}
+            style={{ width: `${pct}%` }}
+          />
         </div>
-
-        <div className="relative">
-          <div className="h-6 overflow-hidden rounded-full border border-foreground/20 bg-foreground/10">
-            <div
-              className={`h-full transition-all duration-1000 ease-out ${
-                isAbove ? "bg-signal-bad" : "bg-signal-good"
-              }`}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <div className="absolute bottom-0 top-0 w-1 bg-foreground" style={{ left: "100%", transform: "translateX(-50%)" }}>
-            <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs opacity-70">
-              Limit
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3 flex justify-between text-xs opacity-60">
+        <div className="flex justify-between text-xs opacity-50">
           <span>0</span>
-          <span>{PLASTIC_THRESHOLD} items</span>
+          <span>Limit: {plasticThreshold} items/week</span>
         </div>
       </div>
     </SectionShell>
@@ -713,82 +694,72 @@ function PlasticSection() {
 }
 
 function GlobalSection() {
-  const totalForecast = dailyForecast.reduce((a, b) => a + b.value, 0);
 
   return (
     <SectionShell bg={BG.global} overlayClass="bg-gradient-to-b from-black/85 via-black/80 to-black/90">
-      <h2 className="section-title">🌍 Local Context & Forecast</h2>
+      <h2 className="section-title">🌿 Compost Planning</h2>
 
-      <div className="mb-6 grid gap-6 md:grid-cols-2">
-        {/* Local Ranking */}
-        <div className="card-brand">
-          <div className="stat-label mb-6">Local Ranking</div>
-          <div className="mb-6">
-            <div className="mb-2 flex items-baseline gap-2">
-              <div className="stat-num-xl">{mockLocality.better_than_count}</div>
-              <div className="text-2xl opacity-70">of {mockLocality.zip_restaurant_count}</div>
-            </div>
-            <div className="text-sm opacity-70">in ZIP 92101</div>
-          </div>
-          <div className="flex gap-2">
-            {Array.from({ length: mockLocality.zip_restaurant_count }).map((_, i) => (
-              <div
-                key={i}
-                className={`h-3 flex-1 rounded-full ${
-                  i + 1 === mockLocality.better_than_count
-                    ? "bg-signal-info"
-                    : i + 1 < mockLocality.better_than_count
-                      ? "bg-signal-good"
-                      : "bg-foreground/20"
-                }`}
-              />
-            ))}
-          </div>
-        </div>
 
-        {/* Current Food Waste */}
-        <div className="card-brand">
-          <div className="stat-label">Current Food Waste</div>
-          <div className="mb-2 flex items-baseline gap-3">
-            <div className="stat-num-xl">{(mockScan.weekly_food_kg * KG_TO_LBS).toFixed(1)}</div>
-            <div className="text-2xl opacity-70">lbs/week</div>
-          </div>
-          <div className="inline-block rounded-lg border border-signal-orange/50 bg-signal-orange/15 px-3 py-1.5">
-            <span className="text-sm font-semibold text-signal-orange">Trending upward</span>
-          </div>
-        </div>
-
-        {/* Compost Shelf Life */}
-        <div className="card-brand">
-          <div className="stat-label">Compost Shelf Life</div>
-          <div className="mb-2 flex items-baseline gap-3">
-            <div className="stat-num-xl">4-6</div>
-            <div className="text-2xl opacity-70">months</div>
-          </div>
-          <div className="text-sm opacity-70">Average curing time for compost</div>
-        </div>
-
-        {/* Next Week Forecast */}
-        <div className="card-brand">
-          <div className="flex items-start gap-4">
-            <div className="icon-tile h-14 w-14 border-signal-warn/40 bg-signal-warn/20">
-              <TrendingUp className="h-7 w-7 text-signal-warn" />
-            </div>
-            <div className="flex-1">
-              <div className="stat-label mb-2">Next Week Forecast</div>
-              <div className="mb-1 text-5xl font-extrabold tabular-nums">
-                {totalForecast.toFixed(1)}
+      {/* Optimized Disposal Schedule */}
+      {(() => {
+        const sorted = [...dailyForecast].sort((a, b) => a.value - b.value);
+        const best = sorted.slice(0, 2);
+        const worst = sorted.slice(-2).reverse();
+        const bestDays = best.map(d => d.day).join(" & ");
+        return (
+          <div className="card-brand-success mb-6">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="text-3xl">📅</span>
+              <div>
+                <div className="stat-label">Optimized Disposal Schedule</div>
+                <div className="text-xs opacity-60 mt-0.5">Based on next-week forecast — schedule pickups on lowest-waste days</div>
               </div>
-              <div className="text-sm opacity-70">lbs projected</div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <div className="mb-2 text-xs font-bold uppercase tracking-wider text-signal-good">Best Days to Dispose</div>
+                <div className="space-y-2">
+                  {best.map((d, i) => (
+                    <div key={d.day} className="flex items-center justify-between rounded-lg border border-signal-good/30 bg-signal-good/10 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{i === 0 ? "🥇" : "🥈"}</span>
+                        <span className="font-bold">{
+                          { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" }[d.day] ?? d.day
+                        }</span>
+                      </div>
+                      <span className="font-bold tabular-nums text-signal-good">{d.value} lbs</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="mb-2 text-xs font-bold uppercase tracking-wider text-signal-bad">Avoid These Days</div>
+                <div className="space-y-2">
+                  {worst.map((d, i) => (
+                    <div key={d.day} className="flex items-center justify-between rounded-lg border border-signal-bad/30 bg-signal-bad/10 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{i === 0 ? "🚨" : "⚠️"}</span>
+                        <span className="font-bold">{
+                          { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" }[d.day] ?? d.day
+                        }</span>
+                      </div>
+                      <span className="font-bold tabular-nums text-signal-bad">{d.value} lbs</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 rounded-lg border border-signal-good/20 bg-signal-good/5 px-3 py-2 text-sm text-signal-good">
+              💡 Schedule compost pickup on <strong>{bestDays}</strong> to minimize disposal cost
             </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Daily Forecast Breakdown */}
       <div className="card-brand mb-6">
         <h3 className="mb-6 text-lg font-bold uppercase tracking-wide text-brand-tan">
-          Daily Forecast Breakdown
+          Locality Level Daily Forecast Breakdown
         </h3>
         <div className="space-y-3">
           {dailyForecast.map((d) => (
@@ -808,45 +779,33 @@ function GlobalSection() {
 
       {/* Nearest Facility */}
       <div className="card-brand-success">
-        <div className="mb-6 flex items-start gap-6">
-          <div className="icon-tile h-20 w-20 border-2 border-signal-good/60 bg-signal-good/20">
-            <Factory className="h-10 w-10 text-signal-good" />
+        <div className="mb-4 flex items-center gap-4">
+          <div className="icon-tile h-14 w-14 border-signal-good/60 bg-signal-good/20">
+            <Factory className="h-7 w-7 text-signal-good" />
           </div>
           <div className="flex-1">
-            <h3 className="mb-2 text-2xl font-bold uppercase tracking-wide">
-              Nearest Composting Facility
-            </h3>
-            <a
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mockInsight.nearest_facility_name ?? "composting facility")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-xl text-signal-good underline-offset-4 hover:underline"
-            >
-              {mockInsight.nearest_facility_name} ↗
-            </a>
-            <p className="mt-1 text-xs opacity-50">Tap for directions</p>
+            <h3 className="text-xl font-bold uppercase tracking-wide">Nearby Composting Facilities</h3>
+            <div className="mt-1 flex items-center gap-3 text-sm">
+              <span className="font-semibold text-signal-good">{mockInsight.nearest_facility_name}</span>
+              <span className="opacity-60">·</span>
+              <span className="flex items-center gap-1 opacity-70">
+                <MapPin className="h-3 w-3" />
+                {((mockInsight.nearest_facility_km ?? 2.4) * KM_TO_MI).toFixed(1)} mi
+              </span>
+            </div>
           </div>
         </div>
-        <div className="grid gap-6 border-t border-foreground/20 pt-6 sm:grid-cols-2">
-          <div>
-            <div className="stat-label mb-2 flex items-center gap-1.5">
-              <MapPin className="h-3 w-3" />
-              Distance
-            </div>
-            <div className="flex items-baseline gap-2">
-              <div className="text-4xl font-extrabold tabular-nums">
-                {(mockInsight.nearest_facility_km * KM_TO_MI).toFixed(1)}
-              </div>
-              <div className="text-xl opacity-70">mi</div>
-            </div>
-          </div>
-          <div>
-            <div className="stat-label mb-2">Capacity</div>
-            <div className="flex items-baseline gap-2">
-              <div className="text-4xl font-extrabold tabular-nums">850</div>
-              <div className="text-xl opacity-70">tons/mo</div>
-            </div>
-          </div>
+        <div className="overflow-hidden rounded-xl border border-signal-good/30">
+          <iframe
+            title="Composting Facilities Near You"
+            src="https://maps.google.com/maps?q=composting+facility+near+San+Diego+CA+92101&output=embed"
+            width="100%"
+            height="300"
+            style={{ border: 0 }}
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
         </div>
       </div>
     </SectionShell>
@@ -871,14 +830,15 @@ const Index = () => {
         if (insight) {
           Object.assign(mockInsight, insight);
           // Databricks returns numbers as strings — coerce all numeric fields
-          mockInsight.sustainability_score = Number(mockInsight.sustainability_score);
-          mockInsight.signal_1 = Number(mockInsight.signal_1);
-          mockInsight.signal_2 = Number(mockInsight.signal_2);
-          mockInsight.signal_3 = Number(mockInsight.signal_3);
-          mockInsight.signal_4 = Number(mockInsight.signal_4);
-          mockInsight.signal_5 = Number(mockInsight.signal_5);
-          mockInsight.co2_avoided = Number(mockInsight.co2_avoided);
-          mockInsight.nearest_facility_km = Number(mockInsight.nearest_facility_km);
+          if (mockInsight.sustainability_score != null) mockInsight.sustainability_score = Number(mockInsight.sustainability_score);
+          if (mockInsight.signal_1 != null) mockInsight.signal_1 = Number(mockInsight.signal_1);
+          if (mockInsight.signal_2 != null) mockInsight.signal_2 = Number(mockInsight.signal_2);
+          if (mockInsight.signal_3 != null) mockInsight.signal_3 = Number(mockInsight.signal_3);
+          if (mockInsight.signal_4 != null) mockInsight.signal_4 = Number(mockInsight.signal_4);
+          if (mockInsight.signal_5 != null) mockInsight.signal_5 = Number(mockInsight.signal_5);
+          if (mockInsight.co2_avoided != null) mockInsight.co2_avoided = Number(mockInsight.co2_avoided);
+          if (mockInsight.nearest_facility_km != null) mockInsight.nearest_facility_km = Number(mockInsight.nearest_facility_km);
+          if (!mockInsight.nearest_facility_name) mockInsight.nearest_facility_name = "Mission Valley Organics";
           // Push weekly totals into mockScan (coerced to number)
           if (insight.weekly_food_kg != null) mockScan.weekly_food_kg = Number(insight.weekly_food_kg);
           if (insight.weekly_dollar_waste != null) mockScan.weekly_dollar_waste = Number(insight.weekly_dollar_waste);
@@ -888,9 +848,6 @@ const Index = () => {
         }
         if (locality) {
           Object.assign(mockLocality, locality);
-          mockLocality.locality_percentile = Number(mockLocality.locality_percentile);
-          mockLocality.better_than_count = Number(mockLocality.better_than_count);
-          mockLocality.zip_restaurant_count = Number(mockLocality.zip_restaurant_count);
         }
         setTick(t => t + 1);
       });
