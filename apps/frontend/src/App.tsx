@@ -628,16 +628,17 @@ export default function App() {
   const [insights, setInsights] = useState<Insight>(MOCK_INSIGHTS);
   const [locality, setLocality] = useState<LocalityAgg>(MOCK_LOCALITY);
   const [weeklySeries, setWeeklySeries] = useState(WEEKLY_SERIES);
+  const [demoMode, setDemoMode] = useState(false);
 
-  // Fetch real data; silently fall back to mock on error
+  // Fetch real data; fall back to mock on error and show demo banner
   useEffect(() => {
     getInsights(RESTAURANT_ID)
       .then((data) => setInsights(data))
-      .catch((err) => console.warn("[SnapWaste] insights unavailable, using mock:", err));
+      .catch((err) => { console.warn("[SnapTrash] insights unavailable, using demo data:", err); setDemoMode(true); });
 
     getLocality(ZIP)
       .then((data) => setLocality(data))
-      .catch((err) => console.warn("[SnapWaste] locality unavailable, using mock:", err));
+      .catch((err) => { console.warn("[SnapTrash] locality unavailable, using demo data:", err); setDemoMode(true); });
 
     // Build weekly sparkline: actuals from scans, forecast derived from Prophet ratio
     getWeeklySeries(RESTAURANT_ID)
@@ -723,6 +724,15 @@ export default function App() {
 
   return (
     <>
+      {demoMode && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999,
+          background: "#b45309", color: "#fff", textAlign: "center",
+          padding: "6px 12px", fontSize: 13, fontWeight: 600, letterSpacing: "0.02em",
+        }}>
+          DEMO MODE — backend unavailable, showing sample data
+        </div>
+      )}
       {/* Sky */}
       <div className="sw-sky">
         <div className="sw-sun" />
